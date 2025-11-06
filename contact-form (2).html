@@ -6,89 +6,169 @@
     <title>Contact Form with Firebase</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f2f2f2;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             margin: 0;
             padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .container {
             width: 90%;
             max-width: 600px;
-            margin: 40px auto;
-            padding: 30px;
+            margin: 20px auto;
+            padding: 40px;
             background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
         }
 
         h1 {
             text-align: center;
-            color: #333;
-            margin-bottom: 25px;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-weight: 600;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        h1:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(to right, #4CAF50, #2E7D32);
+            border-radius: 2px;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            position: relative;
         }
 
         label {
             display: block;
-            font-weight: bold;
+            font-weight: 600;
             margin-bottom: 8px;
+            color: #34495e;
+            transition: color 0.3s;
         }
 
         input, textarea {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            padding: 14px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
             font-size: 16px;
             box-sizing: border-box;
+            transition: all 0.3s;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
         }
 
         button[type="submit"] {
             display: block;
             width: 100%;
-            background-color: #4CAF50;
+            background: linear-gradient(to right, #4CAF50, #2E7D32);
             color: #fff;
-            font-size: 16px;
-            padding: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 16px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
 
         button[type="submit"]:hover {
-            background-color: #3e8e41;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        button[type="submit"]:active {
+            transform: translateY(0);
         }
 
         #form-status {
             text-align: center;
-            margin-top: 15px;
-            font-weight: bold;
+            margin-top: 20px;
+            font-weight: 600;
+            padding: 12px;
+            border-radius: 8px;
+            transition: all 0.3s;
         }
 
         #form-status.success {
-            color: #4caf50;
+            background-color: rgba(76, 175, 80, 0.1);
+            color: #2E7D32;
+            border: 1px solid #4CAF50;
         }
 
         #form-status.error {
-            color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #C0392B;
+            border: 1px solid #E74C3C;
         }
 
         .hidden {
             display: none;
         }
-        
-        .firebase-info {
-            background-color: #f8f9fa;
-            border-left: 4px solid #4285f4;
-            padding: 15px;
+
+        .firebase-status {
+            text-align: center;
             margin-bottom: 20px;
-            border-radius: 0 5px 5px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .firebase-connected {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #2980B9;
+            border: 1px solid #3498DB;
+        }
+
+        .firebase-error {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #C0392B;
+            border: 1px solid #E74C3C;
+        }
+
+        .name-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .name-row .form-group {
+            flex: 1;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+            
+            .name-row {
+                flex-direction: column;
+                gap: 0;
+            }
         }
     </style>
 </head>
@@ -96,24 +176,18 @@
     <div class="container">
         <h1>Contact Us</h1>
         
-        <div class="firebase-info">
-            <h3>Firebase Setup Required</h3>
-            <p>To use this form with Firebase:</p>
-            <ol>
-                <li>Create a Firebase project at <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
-                <li>Enable Firestore Database</li>
-                <li>Update the Firebase configuration below with your project's details</li>
-            </ol>
-        </div>
+        <div id="firebase-status" class="firebase-status hidden"></div>
         
         <form id="contact-form">
-            <div class="form-group">
-                <label for="name">Name:</label>
-                <input type="text" id="name" name="name" required>
-            </div>
-            <div class="form-group">
-                <label for="surname">Surname:</label>
-                <input type="text" id="surname" name="surname" required>
+            <div class="name-row">
+                <div class="form-group">
+                    <label for="name">First Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="surname">Last Name:</label>
+                    <input type="text" id="surname" name="surname" required>
+                </div>
             </div>
             <div class="form-group">
                 <label for="email">Email:</label>
@@ -125,31 +199,50 @@
             </div>
             <div class="form-group">
                 <label for="message">Message:</label>
-                <textarea id="message" name="message" required></textarea>
+                <textarea id="message" name="message" rows="5" required></textarea>
             </div>
-            <button type="submit">Submit</button>
+            <button type="submit">Send Message</button>
             <p id="form-status" class="hidden"></p>
         </form>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+ 
+    <script type="module">
+      
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
 
-    <script>
-        // Firebase configuration - REPLACE WITH YOUR CONFIG
+     
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyBr6KBrv2f02o2QCrNKK1SyLyCF52TdnCc",
+            authDomain: "contact-form-d6fc5.firebaseapp.com",
+            projectId: "contact-form-d6fc5",
+            storageBucket: "contact-form-d6fc5.firebasestorage.app",
+            messagingSenderId: "1029484583788",
+            appId: "1:1029484583788:web:304fb7a4f20f403509b149",
+            measurementId: "G-6P4HYP4ZG2"
         };
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+     
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const analytics = getAnalytics(app);
+        
+      
+        const firebaseStatus = document.getElementById('firebase-status');
+        
+    
+        try {
+            firebaseStatus.textContent = "✓ Connected to Firebase";
+            firebaseStatus.className = "firebase-status firebase-connected";
+            firebaseStatus.classList.remove("hidden");
+        } catch (error) {
+            console.error("Firebase connection error:", error);
+            firebaseStatus.textContent = "✗ Error connecting to Firebase";
+            firebaseStatus.className = "firebase-status firebase-error";
+            firebaseStatus.classList.remove("hidden");
+        }
 
         const form = document.getElementById('contact-form');
         const status = document.getElementById('form-status');
@@ -165,29 +258,30 @@
             }
 
             try {
-                status.textContent = 'Submitting...';
+               
+                status.textContent = 'Sending your message...';
                 status.className = '';
                 status.classList.remove('hidden');
 
-                // Get form data
+              
                 const formData = {
                     name: document.getElementById('name').value,
                     surname: document.getElementById('surname').value,
                     email: document.getElementById('email').value,
                     subject: document.getElementById('subject').value,
                     message: document.getElementById('message').value,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    timestamp: serverTimestamp()
                 };
 
-                // Save to Firestore
-                await db.collection('contactSubmissions').add(formData);
+             
+                await addDoc(collection(db, 'contactSubmissions'), formData);
 
-                // Success
+              
                 form.reset();
                 status.textContent = 'Thank you! Your message has been sent successfully.';
                 status.className = 'success';
                 
-                // Hide success message after 5 seconds
+        
                 setTimeout(() => {
                     status.classList.add('hidden');
                 }, 5000);
