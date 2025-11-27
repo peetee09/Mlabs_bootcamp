@@ -1,3 +1,6 @@
+// ===== API BASE URL =====
+const API_BASE_URL = '/api';
+
 // ===== DATA STORAGE =====
 const STORAGE_KEYS = {
     INVENTORY: 'inventoryData',
@@ -21,12 +24,21 @@ let itemsPerPage = 20;
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', function() {
-    loadDataFromStorage();
-    if (inventoryData.length === 0) loadSampleData();
     initializeApp();
 });
 
-function initializeApp() {
+async function initializeApp() {
+    try {
+        await loadDataFromAPI();
+        if (inventoryData.length === 0) {
+            await loadSampleData();
+        }
+    } catch (error) {
+        console.log('API not available, falling back to localStorage');
+        loadDataFromStorage();
+        if (inventoryData.length === 0) loadSampleDataLocal();
+    }
+    
     updateDashboard();
     renderInventory();
     renderSuppliers();
@@ -38,7 +50,117 @@ function initializeApp() {
     loadSettings();
 }
 
-// ===== LOCAL STORAGE =====
+// ===== API FUNCTIONS =====
+async function loadDataFromAPI() {
+    const [inventoryRes, usageRes, suppliersRes, auditRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/inventory`),
+        fetch(`${API_BASE_URL}/usage`),
+        fetch(`${API_BASE_URL}/suppliers`),
+        fetch(`${API_BASE_URL}/audit`)
+    ]);
+
+    if (!inventoryRes.ok || !usageRes.ok || !suppliersRes.ok || !auditRes.ok) {
+        throw new Error('API not available');
+    }
+
+    inventoryData = await inventoryRes.json();
+    usageData = await usageRes.json();
+    suppliersData = await suppliersRes.json();
+    auditLog = await auditRes.json();
+    notifications = loadFromStorage(STORAGE_KEYS.NOTIFICATIONS) || [];
+}
+
+async function loadSampleData() {
+    // Create sample suppliers first
+    const sampleSuppliers = [
+        { name: "Office Supplies Co", contact: "John Smith", email: "john@officesupplies.com", phone: "555-0101", category: "stationery", rating: 4, address: "123 Main St" },
+        { name: "Tech World Inc", contact: "Jane Doe", email: "jane@techworld.com", phone: "555-0102", category: "electronics", rating: 5, address: "456 Tech Ave" },
+        { name: "Furniture Plus", contact: "Bob Wilson", email: "bob@furnitureplus.com", phone: "555-0103", category: "furniture", rating: 3, address: "789 Oak Rd" }
+    ];
+
+    for (const supplier of sampleSuppliers) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/suppliers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(supplier)
+            });
+            if (response.ok) {
+                const newSupplier = await response.json();
+                suppliersData.push(newSupplier);
+            }
+        } catch (error) {
+            console.error('Error adding sample supplier:', error);
+        }
+    }
+
+    // Create sample inventory items
+    const sampleItems = [
+        { name: "A4 Paper (Ream)", category: "stationery", currentStock: 45, reorderLevel: 20, dailyUsage: 2.5, unitPrice: 5.99, sku: "SKU-001", description: "White A4 paper, 500 sheets" },
+        { name: "Ballpoint Pens", category: "stationery", currentStock: 15, reorderLevel: 25, dailyUsage: 3.2, unitPrice: 0.99, sku: "SKU-002", description: "Blue ink ballpoint pens" },
+        { name: "Stapler", category: "equipment", currentStock: 3, reorderLevel: 5, dailyUsage: 0.1, unitPrice: 12.99, sku: "SKU-003", description: "Heavy duty stapler" },
+        { name: "Laptop", category: "electronics", currentStock: 8, reorderLevel: 3, dailyUsage: 0.05, unitPrice: 899.99, sku: "SKU-004", description: "Business laptop" },
+        { name: "Printer Cartridge", category: "electronics", currentStock: 0, reorderLevel: 2, dailyUsage: 0.3, unitPrice: 45.99, sku: "SKU-005", description: "Black ink cartridge" },
+        { name: "Desk Chair", category: "furniture", currentStock: 2, reorderLevel: 3, dailyUsage: 0.01, unitPrice: 199.99, sku: "SKU-006", description: "Ergonomic office chair" }
+    ];
+
+    for (const item of sampleItems) {
+        try {
+            if (suppliersData.length > 0) {
+                const supplierIndex = sampleItems.indexOf(item) % suppliersData.length;
+                item.supplierId = suppliersData[supplierIndex]._id;
+            }
+            const response = await fetch(`${API_BASE_URL}/inventory`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            });
+            if (response.ok) {
+                const newItem = await response.json();
+                inventoryData.push(newItem);
+            }
+        } catch (error) {
+            console.error('Error adding sample item:', error);
+        }
+    }
+
+    // Generate sample usage data for the past 30 days
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() - (29 - i));
+        
+        for (const item of inventoryData) {
+            const randomFactor = 0.8 + Math.random() * 0.4;
+            const usageQty = Math.round(item.dailyUsage * randomFactor);
+            if (usageQty > 0) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/usage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            itemId: item._id,
+                            quantity: usageQty,
+                            date: date.toISOString(),
+                            notes: ""
+                        })
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        usageData.push(result.usage);
+                    }
+                } catch (error) {
+                    console.error('Error adding sample usage:', error);
+                }
+            }
+        }
+    }
+
+    // Reload data after adding samples
+    await loadDataFromAPI();
+}
+
+// ===== LOCAL STORAGE (Fallback) =====
 function saveToStorage(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
@@ -64,8 +186,8 @@ function saveAllData() {
     saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
 }
 
-// ===== SAMPLE DATA =====
-function loadSampleData() {
+// ===== SAMPLE DATA (Local Fallback) =====
+function loadSampleDataLocal() {
     suppliersData = [
         { id: 1, name: "Office Supplies Co", contact: "John Smith", email: "john@officesupplies.com", phone: "555-0101", category: "stationery", rating: 4, address: "123 Main St" },
         { id: 2, name: "Tech World Inc", contact: "Jane Doe", email: "jane@techworld.com", phone: "555-0102", category: "electronics", rating: 5, address: "456 Tech Ave" },
@@ -103,12 +225,22 @@ function loadSampleData() {
         });
     }
 
-    addAuditEntry('system', 'System initialized with sample data');
+    addAuditEntryLocal('system', 'System initialized with sample data');
     saveAllData();
 }
 
+function addAuditEntryLocal(action, details) {
+    auditLog.push({ id: generateId(auditLog), action, details, user: 'Admin', timestamp: new Date().toISOString() });
+    if (auditLog.length > 500) auditLog = auditLog.slice(-500);
+}
+
 // ===== UTILITY FUNCTIONS =====
+function getItemId(item) {
+    return item._id || item.id;
+}
+
 function getItemStatus(item) {
+    if (item.status) return item.status;
     if (item.currentStock === 0) return "Out of Stock";
     if (item.currentStock <= item.reorderLevel) return "Low";
     return "Healthy";
@@ -128,7 +260,7 @@ function formatDateTime(date) {
 }
 
 function generateId(array) {
-    return array.length > 0 ? Math.max(...array.map(i => i.id)) + 1 : 1;
+    return array.length > 0 ? Math.max(...array.map(i => i.id || 0)) + 1 : 1;
 }
 
 function generateSKU() {
@@ -171,11 +303,12 @@ function renderLowStockTable() {
 
     tbody.innerHTML = lowStockItems.map(item => {
         const days = getDaysUntilStockout(item);
+        const itemId = getItemId(item);
         return `<tr>
             <td>${item.name}</td>
             <td><span class="badge ${getItemStatus(item) === 'Out of Stock' ? 'bg-danger' : 'bg-warning'}">${item.currentStock}</span></td>
             <td>${days === Infinity ? 'N/A' : days + ' days'}</td>
-            <td><button class="btn btn-sm btn-outline-primary" onclick="showRestockModal(${item.id})">Restock</button></td>
+            <td><button class="btn btn-sm btn-outline-primary" onclick="showRestockModal('${itemId}')">Restock</button></td>
         </tr>`;
     }).join('');
 }
@@ -210,12 +343,13 @@ function renderTopUsedItems() {
     const usageByItem = {};
     
     usageData.forEach(record => {
-        usageByItem[record.itemId] = (usageByItem[record.itemId] || 0) + record.quantity;
+        const itemId = record.itemId?._id || record.itemId;
+        usageByItem[itemId] = (usageByItem[itemId] || 0) + record.quantity;
     });
 
     const sortedItems = Object.keys(usageByItem)
         .map(itemId => {
-            const item = inventoryData.find(i => i.id == itemId);
+            const item = inventoryData.find(i => getItemId(i) === itemId || getItemId(i) === String(itemId));
             return { id: itemId, name: item ? item.name : 'Unknown', usage: usageByItem[itemId] };
         })
         .sort((a, b) => b.usage - a.usage)
@@ -292,10 +426,11 @@ function renderInventoryGrid(items) {
         const status = getItemStatus(item);
         const statusClass = status === 'Out of Stock' ? 'out-of-stock' : status === 'Low' ? 'low-stock' : '';
         const days = getDaysUntilStockout(item);
+        const itemId = getItemId(item);
 
         return `
         <div class="inventory-item ${statusClass}">
-            <input type="checkbox" class="item-checkbox form-check-input" value="${item.id}" onchange="toggleItemSelection(${item.id})">
+            <input type="checkbox" class="item-checkbox form-check-input" value="${itemId}" onchange="toggleItemSelection('${itemId}')">
             <div class="item-header">
                 <div>
                     <h5 class="item-name">${item.name}</h5>
@@ -308,10 +443,10 @@ function renderInventoryGrid(items) {
                 <div class="stat-item"><div class="stat-value">${days === Infinity ? '∞' : days}</div><div class="stat-label">Days Left</div></div>
             </div>
             <div class="item-actions">
-                <button class="btn btn-sm btn-outline-primary" onclick="showRecordUsageModal(${item.id})"><i class="bi bi-clipboard-check"></i></button>
-                <button class="btn btn-sm btn-outline-success" onclick="showRestockModal(${item.id})"><i class="bi bi-box-arrow-in-down"></i></button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="showEditItemModal(${item.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="showRecordUsageModal('${itemId}')"><i class="bi bi-clipboard-check"></i></button>
+                <button class="btn btn-sm btn-outline-success" onclick="showRestockModal('${itemId}')"><i class="bi bi-box-arrow-in-down"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="showEditItemModal('${itemId}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${itemId}')"><i class="bi bi-trash"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -329,10 +464,14 @@ function renderInventoryTable(items) {
 
     tbody.innerHTML = items.map(item => {
         const status = getItemStatus(item);
-        const supplier = suppliersData.find(s => s.id === item.supplierId);
+        const supplier = suppliersData.find(s => {
+            const supplierId = item.supplierId?._id || item.supplierId;
+            return getItemId(s) === supplierId || getItemId(s) === String(supplierId);
+        });
+        const itemId = getItemId(item);
         return `<tr>
-            <td><input type="checkbox" class="form-check-input" value="${item.id}" onchange="toggleItemSelection(${item.id})"></td>
-            <td>${item.id}</td>
+            <td><input type="checkbox" class="form-check-input" value="${itemId}" onchange="toggleItemSelection('${itemId}')"></td>
+            <td>${itemId}</td>
             <td>${item.name}</td>
             <td>${item.category}</td>
             <td>${item.currentStock}</td>
@@ -341,10 +480,10 @@ function renderInventoryTable(items) {
             <td><span class="badge ${status === 'Healthy' ? 'bg-success' : status === 'Low' ? 'bg-warning' : 'bg-danger'}">${status}</span></td>
             <td>${supplier ? supplier.name : '-'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="showRecordUsageModal(${item.id})"><i class="bi bi-clipboard-check"></i></button>
-                <button class="btn btn-sm btn-outline-success" onclick="showRestockModal(${item.id})"><i class="bi bi-box-arrow-in-down"></i></button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="showEditItemModal(${item.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="showRecordUsageModal('${itemId}')"><i class="bi bi-clipboard-check"></i></button>
+                <button class="btn btn-sm btn-outline-success" onclick="showRestockModal('${itemId}')"><i class="bi bi-box-arrow-in-down"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="showEditItemModal('${itemId}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${itemId}')"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -386,14 +525,14 @@ function showAddItemModal() {
     new bootstrap.Modal(document.getElementById('addItemModal')).show();
 }
 
-function addNewItem() {
+async function addNewItem() {
     const name = document.getElementById('item-name').value.trim();
     const category = document.getElementById('item-category').value;
     const initialStock = parseInt(document.getElementById('initial-stock').value) || 0;
     const reorderLevel = parseInt(document.getElementById('reorder-level').value) || 1;
     const dailyUsage = parseFloat(document.getElementById('daily-usage-input').value) || 0;
     const unitPrice = parseFloat(document.getElementById('unit-price').value) || 0;
-    const supplierId = parseInt(document.getElementById('item-supplier').value) || null;
+    const supplierId = document.getElementById('item-supplier').value || null;
     const description = document.getElementById('item-description').value.trim();
     const sku = document.getElementById('item-sku').value.trim();
 
@@ -403,13 +542,29 @@ function addNewItem() {
     }
 
     const newItem = {
-        id: generateId(inventoryData),
         name, category, currentStock: initialStock, reorderLevel, dailyUsage, unitPrice, supplierId, description, sku
     };
 
-    inventoryData.push(newItem);
-    addAuditEntry('add', `Added new item: ${name}`);
-    saveAllData();
+    try {
+        const response = await fetch(`${API_BASE_URL}/inventory`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newItem)
+        });
+
+        if (response.ok) {
+            const savedItem = await response.json();
+            inventoryData.push(savedItem);
+        } else {
+            throw new Error('Failed to save item');
+        }
+    } catch (error) {
+        console.log('API not available, saving locally');
+        newItem.id = generateId(inventoryData);
+        inventoryData.push(newItem);
+        addAuditEntryLocal('add', `Added new item: ${name}`);
+        saveAllData();
+    }
     
     bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
     updateDashboard();
@@ -418,11 +573,11 @@ function addNewItem() {
     showToast('Item added successfully', 'success');
 }
 
-function showEditItemModal(id) {
-    const item = inventoryData.find(i => i.id === id);
+async function showEditItemModal(id) {
+    const item = inventoryData.find(i => getItemId(i) === id || getItemId(i) === String(id));
     if (!item) return;
 
-    document.getElementById('edit-item-id').value = item.id;
+    document.getElementById('edit-item-id').value = getItemId(item);
     document.getElementById('edit-item-name').value = item.name;
     document.getElementById('edit-item-category').value = item.category;
     document.getElementById('edit-current-stock').value = item.currentStock;
@@ -433,28 +588,51 @@ function showEditItemModal(id) {
     document.getElementById('edit-item-sku').value = item.sku || '';
     
     populateSupplierDropdown('edit-item-supplier');
-    document.getElementById('edit-item-supplier').value = item.supplierId || '';
+    const supplierId = item.supplierId?._id || item.supplierId;
+    document.getElementById('edit-item-supplier').value = supplierId || '';
 
     new bootstrap.Modal(document.getElementById('editItemModal')).show();
 }
 
-function updateItem() {
-    const id = parseInt(document.getElementById('edit-item-id').value);
-    const item = inventoryData.find(i => i.id === id);
+async function updateItem() {
+    const id = document.getElementById('edit-item-id').value;
+    const item = inventoryData.find(i => getItemId(i) === id || getItemId(i) === String(id));
     if (!item) return;
 
-    item.name = document.getElementById('edit-item-name').value.trim();
-    item.category = document.getElementById('edit-item-category').value;
-    item.currentStock = parseInt(document.getElementById('edit-current-stock').value) || 0;
-    item.reorderLevel = parseInt(document.getElementById('edit-reorder-level').value) || 1;
-    item.dailyUsage = parseFloat(document.getElementById('edit-daily-usage').value) || 0;
-    item.unitPrice = parseFloat(document.getElementById('edit-unit-price').value) || 0;
-    item.supplierId = parseInt(document.getElementById('edit-item-supplier').value) || null;
-    item.description = document.getElementById('edit-item-description').value.trim();
-    item.sku = document.getElementById('edit-item-sku').value.trim();
+    const updatedData = {
+        name: document.getElementById('edit-item-name').value.trim(),
+        category: document.getElementById('edit-item-category').value,
+        currentStock: parseInt(document.getElementById('edit-current-stock').value) || 0,
+        reorderLevel: parseInt(document.getElementById('edit-reorder-level').value) || 1,
+        dailyUsage: parseFloat(document.getElementById('edit-daily-usage').value) || 0,
+        unitPrice: parseFloat(document.getElementById('edit-unit-price').value) || 0,
+        supplierId: document.getElementById('edit-item-supplier').value || null,
+        description: document.getElementById('edit-item-description').value.trim(),
+        sku: document.getElementById('edit-item-sku').value.trim()
+    };
 
-    addAuditEntry('edit', `Updated item: ${item.name}`);
-    saveAllData();
+    try {
+        const response = await fetch(`${API_BASE_URL}/inventory/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedData)
+        });
+
+        if (response.ok) {
+            const savedItem = await response.json();
+            const index = inventoryData.findIndex(i => getItemId(i) === id || getItemId(i) === String(id));
+            if (index !== -1) {
+                inventoryData[index] = savedItem;
+            }
+        } else {
+            throw new Error('Failed to update item');
+        }
+    } catch (error) {
+        console.log('API not available, saving locally');
+        Object.assign(item, updatedData);
+        addAuditEntryLocal('edit', `Updated item: ${item.name}`);
+        saveAllData();
+    }
 
     bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide();
     updateDashboard();
@@ -462,14 +640,30 @@ function updateItem() {
     showToast('Item updated successfully', 'success');
 }
 
-function deleteItem(id) {
-    const item = inventoryData.find(i => i.id === id);
+async function deleteItem(id) {
+    const item = inventoryData.find(i => getItemId(i) === id || getItemId(i) === String(id));
     if (!item || !confirm(`Delete "${item.name}"?`)) return;
 
-    inventoryData = inventoryData.filter(i => i.id !== id);
-    usageData = usageData.filter(u => u.itemId !== id);
-    addAuditEntry('delete', `Deleted item: ${item.name}`);
-    saveAllData();
+    try {
+        const response = await fetch(`${API_BASE_URL}/inventory/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            inventoryData = inventoryData.filter(i => getItemId(i) !== id && getItemId(i) !== String(id));
+            // Also delete usage data for this item
+            await fetch(`${API_BASE_URL}/usage/item/${id}`, { method: 'DELETE' });
+            usageData = usageData.filter(u => (u.itemId !== id && u.itemId !== String(id) && u.itemId?._id !== id));
+        } else {
+            throw new Error('Failed to delete item');
+        }
+    } catch (error) {
+        console.log('API not available, deleting locally');
+        inventoryData = inventoryData.filter(i => getItemId(i) !== id);
+        usageData = usageData.filter(u => u.itemId !== id);
+        addAuditEntryLocal('delete', `Deleted item: ${item.name}`);
+        saveAllData();
+    }
 
     updateDashboard();
     renderInventory();
@@ -485,22 +679,48 @@ function showRecordUsageModal(itemId = null) {
     new bootstrap.Modal(document.getElementById('recordUsageModal')).show();
 }
 
-function recordUsage() {
-    const itemId = parseInt(document.getElementById('usage-item').value);
+async function recordUsage() {
+    const itemId = document.getElementById('usage-item').value;
     const quantity = parseInt(document.getElementById('usage-quantity').value);
     const date = document.getElementById('usage-date').value;
     const notes = document.getElementById('usage-notes').value;
 
-    const item = inventoryData.find(i => i.id === itemId);
+    const item = inventoryData.find(i => getItemId(i) === itemId || getItemId(i) === String(itemId));
     if (!item || quantity <= 0) {
         showToast('Invalid input', 'error');
         return;
     }
 
-    item.currentStock = Math.max(0, item.currentStock - quantity);
-    usageData.push({ id: generateId(usageData), itemId, itemName: item.name, category: item.category, quantity, date: new Date(date).toISOString(), notes });
-    addAuditEntry('usage', `Used ${quantity} of ${item.name}`);
-    saveAllData();
+    try {
+        const response = await fetch(`${API_BASE_URL}/usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                itemId: itemId,
+                quantity: quantity,
+                date: new Date(date).toISOString(),
+                notes: notes
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            usageData.push(result.usage);
+            // Update local item data
+            const index = inventoryData.findIndex(i => getItemId(i) === itemId || getItemId(i) === String(itemId));
+            if (index !== -1 && result.item) {
+                inventoryData[index] = result.item;
+            }
+        } else {
+            throw new Error('Failed to record usage');
+        }
+    } catch (error) {
+        console.log('API not available, saving locally');
+        item.currentStock = Math.max(0, item.currentStock - quantity);
+        usageData.push({ id: generateId(usageData), itemId: getItemId(item), itemName: item.name, category: item.category, quantity, date: new Date(date).toISOString(), notes });
+        addAuditEntryLocal('usage', `Used ${quantity} of ${item.name}`);
+        saveAllData();
+    }
 
     bootstrap.Modal.getInstance(document.getElementById('recordUsageModal')).hide();
     updateDashboard();
@@ -510,10 +730,10 @@ function recordUsage() {
 }
 
 function showRestockModal(id) {
-    const item = inventoryData.find(i => i.id === id);
+    const item = inventoryData.find(i => getItemId(i) === id || getItemId(i) === String(id));
     if (!item) return;
 
-    document.getElementById('restock-item-id').value = item.id;
+    document.getElementById('restock-item-id').value = getItemId(item);
     document.getElementById('restock-item-name').value = item.name;
     document.getElementById('restock-current-stock').value = item.currentStock;
     document.getElementById('restock-quantity').value = '';
@@ -522,19 +742,38 @@ function showRestockModal(id) {
     new bootstrap.Modal(document.getElementById('restockModal')).show();
 }
 
-function restockItem() {
-    const id = parseInt(document.getElementById('restock-item-id').value);
+async function restockItem() {
+    const id = document.getElementById('restock-item-id').value;
     const quantity = parseInt(document.getElementById('restock-quantity').value);
-    const item = inventoryData.find(i => i.id === id);
+    const item = inventoryData.find(i => getItemId(i) === id || getItemId(i) === String(id));
 
     if (!item || quantity <= 0) {
         showToast('Invalid quantity', 'error');
         return;
     }
 
-    item.currentStock += quantity;
-    addAuditEntry('restock', `Restocked ${quantity} of ${item.name}`);
-    saveAllData();
+    try {
+        const response = await fetch(`${API_BASE_URL}/inventory/${id}/restock`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity })
+        });
+
+        if (response.ok) {
+            const updatedItem = await response.json();
+            const index = inventoryData.findIndex(i => getItemId(i) === id || getItemId(i) === String(id));
+            if (index !== -1) {
+                inventoryData[index] = updatedItem;
+            }
+        } else {
+            throw new Error('Failed to restock item');
+        }
+    } catch (error) {
+        console.log('API not available, saving locally');
+        item.currentStock += quantity;
+        addAuditEntryLocal('restock', `Restocked ${quantity} of ${item.name}`);
+        saveAllData();
+    }
 
     bootstrap.Modal.getInstance(document.getElementById('restockModal')).hide();
     updateDashboard();
@@ -552,7 +791,7 @@ function renderSuppliers() {
 
     tbody.innerHTML = suppliersData.map(s => `
         <tr>
-            <td>${s.id}</td>
+            <td>${getItemId(s)}</td>
             <td>${s.name}</td>
             <td>${s.contact}</td>
             <td>${s.email}</td>
@@ -560,8 +799,8 @@ function renderSuppliers() {
             <td>${s.category}</td>
             <td>${'★'.repeat(s.rating)}${'☆'.repeat(5 - s.rating)}</td>
             <td>
-                <button class="btn btn-sm btn-outline-secondary" onclick="editSupplier(${s.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="editSupplier('${getItemId(s)}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier('${getItemId(s)}')"><i class="bi bi-trash"></i></button>
             </td>
         </tr>
     `).join('');
@@ -572,7 +811,7 @@ function showAddSupplierModal() {
     new bootstrap.Modal(document.getElementById('addSupplierModal')).show();
 }
 
-function addSupplier() {
+async function addSupplier() {
     const name = document.getElementById('supplier-name').value.trim();
     const contact = document.getElementById('supplier-contact').value.trim();
     const email = document.getElementById('supplier-email').value.trim();
@@ -585,9 +824,28 @@ function addSupplier() {
         return;
     }
 
-    suppliersData.push({ id: generateId(suppliersData), name, contact, email, phone, category, address, rating: 3 });
-    addAuditEntry('add', `Added supplier: ${name}`);
-    saveAllData();
+    const newSupplier = { name, contact, email, phone, category, address, rating: 3 };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/suppliers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newSupplier)
+        });
+
+        if (response.ok) {
+            const savedSupplier = await response.json();
+            suppliersData.push(savedSupplier);
+        } else {
+            throw new Error('Failed to save supplier');
+        }
+    } catch (error) {
+        console.log('API not available, saving locally');
+        newSupplier.id = generateId(suppliersData);
+        suppliersData.push(newSupplier);
+        addAuditEntryLocal('add', `Added supplier: ${name}`);
+        saveAllData();
+    }
 
     bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide();
     renderSuppliers();
@@ -595,26 +853,53 @@ function addSupplier() {
     showToast('Supplier added', 'success');
 }
 
-function deleteSupplier(id) {
-    const supplier = suppliersData.find(s => s.id === id);
+async function deleteSupplier(id) {
+    const supplier = suppliersData.find(s => getItemId(s) === id || getItemId(s) === String(id));
     if (!supplier || !confirm(`Delete supplier "${supplier.name}"?`)) return;
 
-    suppliersData = suppliersData.filter(s => s.id !== id);
-    addAuditEntry('delete', `Deleted supplier: ${supplier.name}`);
-    saveAllData();
+    try {
+        const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            suppliersData = suppliersData.filter(s => getItemId(s) !== id && getItemId(s) !== String(id));
+        } else {
+            throw new Error('Failed to delete supplier');
+        }
+    } catch (error) {
+        console.log('API not available, deleting locally');
+        suppliersData = suppliersData.filter(s => getItemId(s) !== id);
+        addAuditEntryLocal('delete', `Deleted supplier: ${supplier.name}`);
+        saveAllData();
+    }
+
     renderSuppliers();
     showToast('Supplier deleted', 'success');
 }
 
 // ===== AUDIT LOG =====
-function addAuditEntry(action, details) {
-    auditLog.push({ id: generateId(auditLog), action, details, user: 'Admin', timestamp: new Date().toISOString() });
-    if (auditLog.length > 500) auditLog = auditLog.slice(-500);
+async function addAuditEntry(action, details) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/audit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, details, user: 'Admin' })
+        });
+
+        if (response.ok) {
+            const log = await response.json();
+            auditLog.unshift(log);
+            if (auditLog.length > 500) auditLog = auditLog.slice(0, 500);
+        }
+    } catch (error) {
+        addAuditEntryLocal(action, details);
+    }
 }
 
 function renderAuditLog() {
     const tbody = document.getElementById('audit-log-table');
-    const recent = auditLog.slice(-50).reverse();
+    const recent = auditLog.slice(0, 50);
 
     if (recent.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No audit entries</td></tr>';
@@ -697,11 +982,12 @@ function updateCharts() {
 function checkLowStockAlerts() {
     const lowItems = inventoryData.filter(i => getItemStatus(i) !== 'Healthy');
     lowItems.forEach(item => {
-        const existing = notifications.find(n => n.itemId === item.id && !n.read);
+        const itemId = getItemId(item);
+        const existing = notifications.find(n => n.itemId === itemId && !n.read);
         if (!existing) {
             notifications.push({
                 id: generateId(notifications),
-                itemId: item.id,
+                itemId: itemId,
                 title: getItemStatus(item) === 'Out of Stock' ? 'Out of Stock!' : 'Low Stock Warning',
                 message: `${item.name} needs attention (${item.currentStock} left)`,
                 timestamp: new Date().toISOString(),
@@ -709,7 +995,7 @@ function checkLowStockAlerts() {
             });
         }
     });
-    saveAllData();
+    saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
     updateNotificationCount();
     renderNotifications();
 }
@@ -739,14 +1025,14 @@ function renderNotifications() {
 function markNotificationRead(id) {
     const notification = notifications.find(n => n.id === id);
     if (notification) notification.read = true;
-    saveAllData();
+    saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
     updateNotificationCount();
     renderNotifications();
 }
 
 function clearNotifications() {
     notifications = [];
-    saveAllData();
+    saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
     updateNotificationCount();
     renderNotifications();
 }
@@ -1018,14 +1304,14 @@ function populateItemDropdown(id) {
     const dropdown = document.getElementById(id);
     if (!dropdown) return;
     dropdown.innerHTML = '<option value="">Select Item</option>' + 
-        inventoryData.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+        inventoryData.map(item => `<option value="${getItemId(item)}">${item.name}</option>`).join('');
 }
 
 function populateSupplierDropdown(id) {
     const dropdown = document.getElementById(id);
     if (!dropdown) return;
     dropdown.innerHTML = '<option value="">Select Supplier</option>' + 
-        suppliersData.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        suppliersData.map(s => `<option value="${getItemId(s)}">${s.name}</option>`).join('');
 }
 
 function toggleItemSelection(id) {
@@ -1037,7 +1323,7 @@ function toggleItemSelection(id) {
 
 function toggleSelectAll() {
     const checked = document.getElementById('select-all').checked;
-    selectedItems = checked ? inventoryData.map(i => i.id) : [];
+    selectedItems = checked ? inventoryData.map(i => getItemId(i)) : [];
     document.querySelectorAll('.item-checkbox, .form-check-input[type="checkbox"]').forEach(cb => cb.checked = checked);
     document.getElementById('bulk-action-btn').disabled = selectedItems.length === 0;
 }
