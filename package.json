@@ -1,0 +1,19 @@
+{
+  "name": "inventory-management-system",
+  "version": "1.0.0",
+  "description": "Advanced Department Equipment & Stationery Inventory Management System",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . -l 3000"
+  },
+  "keywords": [
+    "inventory",
+    "management",
+    "stationery",
+    "equipment",
+    "department"
+  ],
+  "author": "",
+  "license": "MIT"
+}
