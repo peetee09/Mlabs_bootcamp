@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Equipment & Stationery Inventory System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        .card {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: none;
+        }
+        .card-header {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #3498db;
+            color: white;
+            border: none;
+        }
+        .nav-tabs .nav-link {
+            color: #2c3e50;
+        }
+        .form-control:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        }
+        .btn-primary {
+            background-color: #3498db;
+            border-color: #3498db;
+        }
+        .btn-primary:hover {
+            background-color: #2980b9;
+            border-color: #2980b9;
+        }
+        .performance-stats {
+            font-size: 0.9rem;
+        }
+        .table th {
+            background-color: #f1f8ff;
+        }
+        .inventory-item {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        .low-stock {
+            border-left-color: #e74c3c;
+        }
+        .healthy-stock {
+            border-left-color: #2ecc71;
+        }
+        .usage-badge {
+            font-size: 0.7rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1 class="display-5">Department Equipment & Stationery Inventory System</h1>
+            <p class="lead">Consultative Management for Department Champions</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">Dashboard</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">Current Inventory</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="usage-tab" data-bs-toggle="tab" data-bs-target="#usage" type="button" role="tab">Usage Analysis</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="forecast-tab" data-bs-toggle="tab" data-bs-target="#forecast" type="button" role="tab">Forecasting</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab">Reports</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="myTabContent">
+            <!-- Dashboard Tab -->
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Items</h5>
+                                <h2 class="text-primary" id="total-items">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Low Stock Items</h5>
+                                <h2 class="text-warning" id="low-stock">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Out of Stock</h5>
+                                <h2 class="text-danger" id="out-of-stock">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Daily Usage</h5>
+                                <h2 class="text-success" id="daily-usage">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">Weekly Usage Trends</div>
+                            <div class="card-body">
+                                <canvas id="weeklyUsageChart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">Most Used Items</div>
+                            <div class="card-body">
+                                <div id="most-used-items">
+                                    <!-- Most used items will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mt-4">
+                            <div class="card-header">Quick Actions</div>
+                            <div class="card-body">
+                                <button class="btn btn-primary w-100 mb-2" onclick="showAddItemModal()">Add New Item</button>
+                                <button class="btn btn-outline-primary w-100 mb-2" onclick="showReorderModal()">Generate Order Request</button>
+                                <button class="btn btn-outline-primary w-100" onclick="exportUsageReport()">Export Usage Report</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">Low Stock Alert</div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Item Name</th>
+                                                <th>Current Stock</th>
+                                                <th>Reorder Level</th>
+                                                <th>Daily Usage</th>
+                                                <th>Days Until Stockout</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="low-stock-table">
+                                            <!-- Low stock items will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Inventory Tab -->
+            <div class="tab-pane fade" id="inventory" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Current Inventory</span>
+                        <button class="btn btn-sm btn-primary" onclick="showAddItemModal()">Add New Item</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Item ID</th>
+                                        <th>Item Name</th>
+                                        <th>Category</th>
+                                        <th>Current Stock</th>
+                                        <th>Reorder Level</th>
+                                        <th>Daily Usage</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-table">
+                                    <!-- Inventory items will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage Analysis Tab -->
+            <div class="tab-pane fade" id="usage" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">Monthly Usage Trends</div>
+                            <div class="card-body">
+                                <canvas id="monthlyUsageChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">Usage by Category</div>
+                            <div class="card-body">
+                                <canvas id="categoryUsageChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">Detailed Usage Data</div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Item Name</th>
+                                                <th>Category</th>
+                                                <th>Daily Usage</th>
+                                                <th>Weekly Usage</th>
+                                                <th>Monthly Usage</th>
+                                                <th>Usage Trend</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="usage-table">
+                                            <!-- Usage data will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forecasting Tab -->
+            <div class="tab-pane fade" id="forecast" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Stockout Forecast</div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Item Name</th>
+                                                <th>Current Stock</th>
+                                                <th>Daily Usage</th>
+                                                <th>Days Until Stockout</th>
+                                                <th>Recommended Order Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="forecast-table">
+                                            <!-- Forecast data will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Order Recommendations</div>
+                            <div class="card-body">
+                                <div id="order-recommendations">
+                                    <!-- Order recommendations will be populated here -->
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" onclick="generateOrderRequest()">Generate Order Request PDF</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div class="tab-pane fade" id="reports" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Export Reports</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Select Report Type</label>
+                                    <select class="form-select" id="report-type">
+                                        <option value="usage">Usage Report</option>
+                                        <option value="inventory">Inventory Status</option>
+                                        <option value="forecast">Stock Forecast</option>
+                                        <option value="order">Order Recommendations</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Time Period</label>
+                                    <select class="form-select" id="report-period">
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="quarterly">Quarterly</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="exportReport()">Export to Excel</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Report Preview</div>
+                            <div class="card-body">
+                                <div id="report-preview">
+                                    <p class="text-muted">Select report options to see preview</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addItemModalLabel">Add New Inventory Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-item-form">
+                        <div class="mb-3">
+                            <label for="item-name" class="form-label">Item Name</label>
+                            <input type="text" class="form-control" id="item-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="item-category" class="form-label">Category</label>
+                            <select class="form-select" id="item-category" required>
+                                <option value="">Select Category</option>
+                                <option value="stationery">Stationery</option>
+                                <option value="equipment">Equipment</option>
+                                <option value="electronics">Electronics</option>
+                                <option value="furniture">Furniture</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="initial-stock" class="form-label">Initial Stock</label>
+                            <input type="number" class="form-control" id="initial-stock" min="0" value="0" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reorder-level" class="form-label">Reorder Level</label>
+                            <input type="number" class="form-control" id="reorder-level" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="daily-usage" class="form-label">Estimated Daily Usage</label>
+                            <input type="number" class="form-control" id="daily-usage" min="0" value="0" step="0.1" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewItem()">Add Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Record Usage Modal -->
+    <div class="modal fade" id="recordUsageModal" tabindex="-1" aria-labelledby="recordUsageModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recordUsageModalLabel">Record Item Usage</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="record-usage-form">
+                        <div class="mb-3">
+                            <label for="usage-item" class="form-label">Item</label>
+                            <select class="form-select" id="usage-item" required>
+                                <!-- Items will be populated here -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="usage-quantity" class="form-label">Quantity Used</label>
+                            <input type="number" class="form-control" id="usage-quantity" min="1" value="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="usage-date" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="usage-date" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="recordUsage()">Record Usage</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Inventory data structure
+        let inventoryData = [];
+        let usageData = [];
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSampleData();
+            updateDashboard();
+            renderInventoryTable();
+            renderLowStockTable();
+            initializeCharts();
+            populateUsageItemDropdown();
+        });
+
+        // Load sample data for demonstration
+        function loadSampleData() {
+            // Sample inventory items
+            inventoryData = [
+                { 
+                    id: 1, 
+                    name: "A4 Paper (Ream)", 
+                    category: "stationery", 
+                    currentStock: 45, 
+                    reorderLevel: 20, 
+                    dailyUsage: 2.5,
+                    status: "Healthy" 
+                },
+                { 
+                    id: 2, 
+                    name: "Ballpoint Pens", 
+                    category: "stationery", 
+                    currentStock: 15, 
+                    reorderLevel: 25, 
+                    dailyUsage: 3.2,
+                    status: "Low" 
+                },
+                { 
+                    id: 3, 
+                    name: "Stapler", 
+                    category: "equipment", 
+                    currentStock: 3, 
+                    reorderLevel: 5, 
+                    dailyUsage: 0.1,
+                    status: "Low" 
+                },
+                { 
+                    id: 4, 
+                    name: "Laptop", 
+                    category: "electronics", 
+                    currentStock: 8, 
+                    reorderLevel: 3, 
+                    dailyUsage: 0.05,
+                    status: "Healthy" 
+                },
+                { 
+                    id: 5, 
+                    name: "Printer Cartridge", 
+                    category: "electronics", 
+                    currentStock: 0, 
+                    reorderLevel: 2, 
+                    dailyUsage: 0.3,
+                    status: "Out of Stock" 
+                },
+                { 
+                    id: 6, 
+                    name: "Desk Chair", 
+                    category: "furniture", 
+                    currentStock: 2, 
+                    reorderLevel: 3, 
+                    dailyUsage: 0.01,
+                    status: "Low" 
+                }
+            ];
+
+            // Generate sample usage data for the past 30 days
+            const today = new Date();
+            for (let i = 0; i < 30; i++) {
+                const date = new Date();
+                date.setDate(today.getDate() - (29 - i));
+                
+                inventoryData.forEach(item => {
+                    // Add some randomness to daily usage
+                    const randomFactor = 0.8 + Math.random() * 0.4;
+                    const usageQty = Math.round(item.dailyUsage * randomFactor);
+                    
+                    if (usageQty > 0) {
+                        usageData.push({
+                            itemId: item.id,
+                            itemName: item.name,
+                            category: item.category,
+                            quantity: usageQty,
+                            date: new Date(date)
+                        });
+                    }
+                });
+            }
+        }
+
+        // Update dashboard statistics
+        function updateDashboard() {
+            const totalItems = inventoryData.length;
+            const lowStock = inventoryData.filter(item => item.status === "Low").length;
+            const outOfStock = inventoryData.filter(item => item.status === "Out of Stock").length;
+            
+            // Calculate total daily usage
+            const dailyUsage = inventoryData.reduce((sum, item) => {
+                return sum + item.dailyUsage;
+            }, 0);
+            
+            document.getElementById('total-items').textContent = totalItems;
+            document.getElementById('low-stock').textContent = lowStock;
+            document.getElementById('out-of-stock').textContent = outOfStock;
+            document.getElementById('daily-usage').textContent = dailyUsage.toFixed(1);
+            
+            updateMostUsedItems();
+        }
+
+        // Update most used items list
+        function updateMostUsedItems() {
+            const container = document.getElementById('most-used-items');
+            container.innerHTML = '';
+            
+            // Calculate total usage for each item
+            const usageByItem = {};
+            usageData.forEach(record => {
+                if (!usageByItem[record.itemId]) {
+                    usageByItem[record.itemId] = 0;
+                }
+                usageByItem[record.itemId] += record.quantity;
+            });
+            
+            // Sort by usage (descending)
+            const sortedItems = Object.keys(usageByItem)
+                .map(itemId => {
+                    const item = inventoryData.find(i => i.id == itemId);
+                    return {
+                        id: itemId,
+                        name: item ? item.name : 'Unknown',
+                        usage: usageByItem[itemId]
+                    };
+                })
+                .sort((a, b) => b.usage - a.usage)
+                .slice(0, 5); // Top 5
+            
+            if (sortedItems.length === 0) {
+                container.innerHTML = '<p class="text-muted">No usage data available</p>';
+                return;
+            }
+            
+            sortedItems.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'd-flex justify-content-between align-items-center mb-2';
+                itemElement.innerHTML = `
+                    <span>${item.name}</span>
+                    <span class="badge bg-primary usage-badge">${item.usage} used</span>
+                `;
+                container.appendChild(itemElement);
+            });
+        }
+
+        // Render inventory table
+        function renderInventoryTable() {
+            const tableBody = document.getElementById('inventory-table');
+            tableBody.innerHTML = '';
+            
+            inventoryData.forEach(item => {
+                const row = document.createElement('tr');
+                let statusClass = '';
+                
+                if (item.status === "Low") statusClass = 'table-warning';
+                if (item.status === "Out of Stock") statusClass = 'table-danger';
+                
+                // Calculate days until stockout
+                const daysUntilStockout = item.dailyUsage > 0 ? 
+                    Math.floor(item.currentStock / item.dailyUsage) : 
+                    'N/A';
+                
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>${item.currentStock}</td>
+                    <td>${item.reorderLevel}</td>
+                    <td>${item.dailyUsage.toFixed(1)}</td>
+                    <td><span class="badge ${item.status === 'Healthy' ? 'bg-success' : item.status === 'Low' ? 'bg-warning' : 'bg-danger'}">${item.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="showRecordUsageModal(${item.id})">Record Usage</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editItem(${item.id})">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.id})">Delete</button>
+                    </td>
+                `;
+                
+                if (statusClass) row.className = statusClass;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Render low stock table
+        function renderLowStockTable() {
+            const tableBody = document.getElementById('low-stock-table');
+            tableBody.innerHTML = '';
+            
+            const lowStockItems = inventoryData.filter(item => item.status !== "Healthy");
+            
+            if (lowStockItems.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No low stock items</td></tr>';
+                return;
+            }
+            
+            lowStockItems.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // Calculate days until stockout
+                const daysUntilStockout = item.dailyUsage > 0 ? 
+                    Math.floor(item.currentStock / item.dailyUsage) : 
+                    'N/A';
+                
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.currentStock}</td>
+                    <td>${item.reorderLevel}</td>
+                    <td>${item.dailyUsage.toFixed(1)}</td>
+                    <td>${daysUntilStockout}</td>
+                    <td><button class="btn btn-sm btn-primary" onclick="reorderItem(${item.id})">Add to Order</button></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            // Weekly usage chart
+            const weeklyUsageCtx = document.getElementById('weeklyUsageChart').getContext('2d');
+            const weeklyUsageChart = new Chart(weeklyUsageCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                    datasets: [{
+                        label: 'Stationery',
+                        data: [45, 52, 38, 47],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.3
+                    }, {
+                        label: 'Equipment',
+                        data: [12, 15, 18, 14],
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Weekly Usage Trends'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Units Used'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Monthly usage chart
+            const monthlyUsageCtx = document.getElementById('monthlyUsageChart').getContext('2d');
+            const monthlyUsageChart = new Chart(monthlyUsageCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Total Usage',
+                        data: [320, 290, 350, 410, 380, 420],
+                        backgroundColor: '#3498db'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Monthly Usage Trends'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Units Used'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Category usage chart
+            const categoryUsageCtx = document.getElementById('categoryUsageChart').getContext('2d');
+            const categoryUsageChart = new Chart(categoryUsageCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Stationery', 'Equipment', 'Electronics', 'Furniture'],
+                    datasets: [{
+                        data: [65, 15, 12, 8],
+                        backgroundColor: [
+                            '#3498db',
+                            '#2ecc71',
+                            '#e74c3c',
+                            '#f39c12'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Usage by Category'
+                        }
+                    }
+                }
+            });
+
+            // Store chart references for updates
+            window.weeklyUsageChart = weeklyUsageChart;
+            window.monthlyUsageChart = monthlyUsageChart;
+            window.categoryUsageChart = categoryUsageChart;
+        }
+
+        // Populate usage item dropdown
+        function populateUsageItemDropdown() {
+            const dropdown = document.getElementById('usage-item');
+            dropdown.innerHTML = '<option value="">Select Item</option>';
+            
+            inventoryData.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name;
+                dropdown.appendChild(option);
+            });
+        }
+
+        // Show add item modal
+        function showAddItemModal() {
+            const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+            modal.show();
+        }
+
+        // Show record usage modal
+        function showRecordUsageModal(itemId = null) {
+            const modal = new bootstrap.Modal(document.getElementById('recordUsageModal'));
+            
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('usage-date').value = today;
+            
+            // Select specific item if provided
+            if (itemId) {
+                document.getElementById('usage-item').value = itemId;
+            }
+            
+            modal.show();
+        }
+
+        // Add new item to inventory
+        function addNewItem() {
+            const name = document.getElementById('item-name').value;
+            const category = document.getElementById('item-category').value;
+            const initialStock = parseInt(document.getElementById('initial-stock').value);
+            const reorderLevel = parseInt(document.getElementById('reorder-level').value);
+            const dailyUsage = parseFloat(document.getElementById('daily-usage').value);
+            
+            if (!name || !category || isNaN(initialStock) || isNaN(reorderLevel) || isNaN(dailyUsage)) {
+                alert('Please fill all fields with valid values');
+                return;
+            }
+            
+            // Determine status
+            let status = "Healthy";
+            if (initialStock === 0) {
+                status = "Out of Stock";
+            } else if (initialStock <= reorderLevel) {
+                status = "Low";
+            }
+            
+            // Add new item
+            const newId = inventoryData.length > 0 ? Math.max(...inventoryData.map(item => item.id)) + 1 : 1;
+            inventoryData.push({
+                id: newId,
+                name,
+                category,
+                currentStock: initialStock,
+                reorderLevel,
+                dailyUsage,
+                status
+            });
+            
+            // Close modal and update UI
+            bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
+            document.getElementById('add-item-form').reset();
+            
+            updateDashboard();
+            renderInventoryTable();
+            renderLowStockTable();
+            populateUsageItemDropdown();
+            
+            alert('Item added successfully!');
+        }
+
+        // Record item usage
+        function recordUsage() {
+            const itemId = parseInt(document.getElementById('usage-item').value);
+            const quantity = parseInt(document.getElementById('usage-quantity').value);
+            const date = new Date(document.getElementById('usage-date').value);
+            
+            if (!itemId || isNaN(quantity) || quantity <= 0 || !date) {
+                alert('Please fill all fields with valid values');
+                return;
+            }
+            
+            // Find the item
+            const item = inventoryData.find(item => item.id === itemId);
+            if (!item) {
+                alert('Item not found');
+                return;
+            }
+            
+            // Update stock
+            item.currentStock = Math.max(0, item.currentStock - quantity);
+            
+            // Update status
+            if (item.currentStock === 0) {
+                item.status = "Out of Stock";
+            } else if (item.currentStock <= item.reorderLevel) {
+                item.status = "Low";
+            } else {
+                item.status = "Healthy";
+            }
+            
+            // Add to usage data
+            usageData.push({
+                itemId: item.id,
+                itemName: item.name,
+                category: item.category,
+                quantity: quantity,
+                date: date
+            });
+            
+            // Update daily usage (simple average of last 7 days)
+            updateDailyUsage(item);
+            
+            // Close modal and update UI
+            bootstrap.Modal.getInstance(document.getElementById('recordUsageModal')).hide();
+            document.getElementById('record-usage-form').reset();
+            
+            updateDashboard();
+            renderInventoryTable();
+            renderLowStockTable();
+            
+            alert('Usage recorded successfully!');
+        }
+
+        // Update daily usage based on recent usage data
+        function updateDailyUsage(item) {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            
+            const recentUsage = usageData.filter(record => 
+                record.itemId === item.id && record.date >= sevenDaysAgo
+            );
+            
+            if (recentUsage.length > 0) {
+                const totalUsage = recentUsage.reduce((sum, record) => sum + record.quantity, 0);
+                item.dailyUsage = totalUsage / 7;
+            }
+        }
+
+        // Edit item (placeholder)
+        function editItem(id) {
+            const item = inventoryData.find(item => item.id === id);
+            if (item) {
+                // In a real implementation, this would open an edit modal
+                const newStock = prompt(`Enter new stock quantity for ${item.name}:`, item.currentStock);
+                if (newStock !== null && !isNaN(newStock)) {
+                    item.currentStock = parseInt(newStock);
+                    
+                    // Update status
+                    if (item.currentStock === 0) {
+                        item.status = "Out of Stock";
+                    } else if (item.currentStock <= item.reorderLevel) {
+                        item.status = "Low";
+                    } else {
+                        item.status = "Healthy";
+                    }
+                    
+                    updateDashboard();
+                    renderInventoryTable();
+                    renderLowStockTable();
+                }
+            }
+        }
+
+        // Delete item
+        function deleteItem(id) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                inventoryData = inventoryData.filter(item => item.id !== id);
+                // Also remove usage data for this item
+                usageData = usageData.filter(record => record.itemId !== id);
+                
+                updateDashboard();
+                renderInventoryTable();
+                renderLowStockTable();
+                populateUsageItemDropdown();
+            }
+        }
+
+        // Reorder item
+        function reorderItem(id) {
+            const item = inventoryData.find(item => item.id === id);
+            if (item) {
+                // In a real system, this would add to an order list
+                alert(`${item.name} has been added to the order request.`);
+            }
+        }
+
+        // Show reorder modal
+        function showReorderModal() {
+            const lowStockItems = inventoryData.filter(item => item.status !== "Healthy");
+            
+            if (lowStockItems.length === 0) {
+                alert('No items need to be reordered at this time.');
+                return;
+            }
+            
+            let message = "The following items need to be reordered:\n\n";
+            lowStockItems.forEach(item => {
+                const recommendedOrderQty = Math.max(item.reorderLevel * 2, 10); // Simple recommendation
+                message += `- ${item.name}: ${recommendedOrderQty} units (Current: ${item.currentStock})\n`;
+            });
+            
+            message += "\nWould you like to generate an order request PDF?";
+            
+            if (confirm(message)) {
+                generateOrderRequest();
+            }
+        }
+
+        // Generate order request PDF
+        function generateOrderRequest() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Add header
+            doc.setFontSize(20);
+            doc.text('Dispatch Department', 20, 30);
+            doc.setFontSize(16);
+            doc.text('Inventory Order Request', 20, 45);
+            
+            // Add date
+            const today = new Date();
+            doc.setFontSize(12);
+            doc.text(`Date: ${today.toLocaleDateString()}`, 20, 60);
+            
+            // Add table
+            const lowStockItems = inventoryData.filter(item => item.status !== "Healthy");
+            const tableData = lowStockItems.map(item => {
+                const recommendedOrderQty = Math.max(item.reorderLevel * 2, 10);
+                return [
+                    item.name,
+                    item.category,
+                    item.currentStock,
+                    item.reorderLevel,
+                    recommendedOrderQty
+                ];
+            });
+            
+            doc.autoTable({
+                startY: 70,
+                head: [['Item Name', 'Category', 'Current Stock', 'Reorder Level', 'Order Qty']],
+                body: tableData,
+                theme: 'grid'
+            });
+            
+            // Add footer
+            const finalY = doc.lastAutoTable.finalY + 20;
+            doc.text('Generated by Department Inventory System', 20, finalY);
+            
+            // Save the PDF
+            doc.save('department-order-request.pdf');
+        }
+
+        // Export usage report to Excel
+        function exportUsageReport() {
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Prepare usage data for export
+            const exportData = usageData.map(record => {
+                return {
+                    'Item Name': record.itemName,
+                    'Category': record.category,
+                    'Quantity': record.quantity,
+                    'Date': record.date.toLocaleDateString()
+                };
+            });
+            
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Usage Report');
+            
+            // Export to file
+            XLSX.writeFile(wb, 'department-usage-report.xlsx');
+        }
+
+        // Export report based on selected options
+        function exportReport() {
+            const reportType = document.getElementById('report-type').value;
+            const reportPeriod = document.getElementById('report-period').value;
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            let ws, fileName;
+            
+            switch(reportType) {
+                case 'usage':
+                    // Prepare usage data for export
+                    const exportData = usageData.map(record => {
+                        return {
+                            'Item Name': record.itemName,
+                            'Category': record.category,
+                            'Quantity': record.quantity,
+                            'Date': record.date.toLocaleDateString()
+                        };
+                    });
+                    ws = XLSX.utils.json_to_sheet(exportData);
+                    fileName = `department-${reportPeriod}-usage-report.xlsx`;
+                    break;
+                    
+                case 'inventory':
+                    // Prepare inventory data for export
+                    const inventoryExport = inventoryData.map(item => {
+                        return {
+                            'Item Name': item.name,
+                            'Category': item.category,
+                            'Current Stock': item.currentStock,
+                            'Reorder Level': item.reorderLevel,
+                            'Daily Usage': item.dailyUsage,
+                            'Status': item.status
+                        };
+                    });
+                    ws = XLSX.utils.json_to_sheet(inventoryExport);
+                    fileName = `department-inventory-status.xlsx`;
+                    break;
+                    
+                case 'forecast':
+                    // Prepare forecast data for export
+                    const forecastExport = inventoryData.map(item => {
+                        const daysUntilStockout = item.dailyUsage > 0 ? 
+                            Math.floor(item.currentStock / item.dailyUsage) : 
+                            'N/A';
+                            
+                        let recommendedOrderDate = 'N/A';
+                        if (daysUntilStockout !== 'N/A' && daysUntilStockout <= 14) {
+                            const orderDate = new Date();
+                            orderDate.setDate(orderDate.getDate() + (daysUntilStockout - 7));
+                            recommendedOrderDate = orderDate.toLocaleDateString();
+                        }
+                        
+                        return {
+                            'Item Name': item.name,
+                            'Category': item.category,
+                            'Current Stock': item.currentStock,
+                            'Daily Usage': item.dailyUsage,
+                            'Days Until Stockout': daysUntilStockout,
+                            'Recommended Order Date': recommendedOrderDate
+                        };
+                    });
+                    ws = XLSX.utils.json_to_sheet(forecastExport);
+                    fileName = `department-stock-forecast.xlsx`;
+                    break;
+                    
+                case 'order':
+                    // Prepare order recommendations for export
+                    const lowStockItems = inventoryData.filter(item => item.status !== "Healthy");
+                    const orderExport = lowStockItems.map(item => {
+                        const recommendedOrderQty = Math.max(item.reorderLevel * 2, 10);
+                        return {
+                            'Item Name': item.name,
+                            'Category': item.category,
+                            'Current Stock': item.currentStock,
+                            'Reorder Level': item.reorderLevel,
+                            'Recommended Order Qty': recommendedOrderQty
+                        };
+                    });
+                    ws = XLSX.utils.json_to_sheet(orderExport);
+                    fileName = `department-order-recommendations.xlsx`;
+                    break;
+            }
+            
+            // Add worksheet to workbook and export
+            XLSX.utils.book_append_sheet(wb, ws, 'Report');
+            XLSX.writeFile(wb, fileName);
+            
+            alert(`Report exported successfully as ${fileName}`);
+        }
+    </script>
+</body>
+</html>
