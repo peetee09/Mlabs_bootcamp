@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Inventory Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h4><i class="bi bi-box-seam"></i> InventoryPro</h4>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="nav-item active" data-tab="dashboard">
+                <i class="bi bi-speedometer2"></i>
+                <span>Dashboard</span>
+            </li>
+            <li class="nav-item" data-tab="inventory">
+                <i class="bi bi-archive"></i>
+                <span>Inventory</span>
+            </li>
+            <li class="nav-item" data-tab="usage">
+                <i class="bi bi-graph-up"></i>
+                <span>Usage Analysis</span>
+            </li>
+            <li class="nav-item" data-tab="forecast">
+                <i class="bi bi-calendar-check"></i>
+                <span>Forecasting</span>
+            </li>
+            <li class="nav-item" data-tab="suppliers">
+                <i class="bi bi-truck"></i>
+                <span>Suppliers</span>
+            </li>
+            <li class="nav-item" data-tab="history">
+                <i class="bi bi-clock-history"></i>
+                <span>Audit Log</span>
+            </li>
+            <li class="nav-item" data-tab="reports">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Reports</span>
+            </li>
+            <li class="nav-item" data-tab="settings">
+                <i class="bi bi-gear"></i>
+                <span>Settings</span>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <button id="dark-mode-toggle" class="btn btn-outline-light w-100">
+                <i class="bi bi-moon"></i> Dark Mode
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Navigation Bar -->
+        <nav class="top-nav">
+            <button id="sidebar-toggle" class="btn btn-link">
+                <i class="bi bi-list"></i>
+            </button>
+            <div class="search-container">
+                <i class="bi bi-search"></i>
+                <input type="text" id="global-search" class="form-control" placeholder="Search items, suppliers...">
+            </div>
+            <div class="nav-actions">
+                <button class="btn btn-link position-relative" id="notification-btn">
+                    <i class="bi bi-bell"></i>
+                    <span class="notification-badge" id="notification-count">0</span>
+                </button>
+                <button class="btn btn-link" id="scan-btn" title="Scan QR/Barcode">
+                    <i class="bi bi-qr-code-scan"></i>
+                </button>
+                <button class="btn btn-link" id="fullscreen-btn">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <div class="user-profile dropdown">
+                    <button class="btn dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i>
+                        <span id="current-user">Admin</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="showUserProfile()"><i class="bi bi-person"></i> Profile</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="showSettings()"><i class="bi bi-gear"></i> Settings</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Dashboard Tab -->
+            <div class="tab-content active" id="dashboard-content">
+                <div class="page-header">
+                    <h2>Dashboard</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="showAddItemModal()">
+                            <i class="bi bi-plus-lg"></i> Add Item
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="refreshDashboard()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row stats-row">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stats-card total">
+                            <div class="stats-icon">
+                                <i class="bi bi-box"></i>
+                            </div>
+                            <div class="stats-info">
+                                <h3 id="total-items">0</h3>
+                                <p>Total Items</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stats-card warning">
+                            <div class="stats-icon">
+                                <i class="bi bi-exclamation-triangle"></i>
+                            </div>
+                            <div class="stats-info">
+                                <h3 id="low-stock">0</h3>
+                                <p>Low Stock</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stats-card danger">
+                            <div class="stats-icon">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                            <div class="stats-info">
+                                <h3 id="out-of-stock">0</h3>
+                                <p>Out of Stock</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stats-card success">
+                            <div class="stats-icon">
+                                <i class="bi bi-graph-up-arrow"></i>
+                            </div>
+                            <div class="stats-info">
+                                <h3 id="daily-usage">0</h3>
+                                <p>Daily Usage</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row mt-4">
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Usage Trends</span>
+                                <select class="form-select form-select-sm w-auto" id="chart-period">
+                                    <option value="week">Last 7 Days</option>
+                                    <option value="month">Last 30 Days</option>
+                                    <option value="quarter">Last 90 Days</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="usageTrendChart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">Category Distribution</div>
+                            <div class="card-body">
+                                <canvas id="categoryChart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Low Stock and Recent Activity Row -->
+                <div class="row mt-4">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock Alerts</span>
+                                <a href="#" onclick="showTab('inventory')" class="text-primary">View All</a>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Item</th>
+                                                <th>Stock</th>
+                                                <th>Days Left</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="low-stock-table">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-clock"></i> Recent Activity</span>
+                                <a href="#" onclick="showTab('history')" class="text-primary">View All</a>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="activity-list" id="recent-activity">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Used Items -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">Top 5 Most Used Items</div>
+                            <div class="card-body">
+                                <div class="row" id="top-used-items">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div class="tab-content" id="inventory-content">
+                <div class="page-header">
+                    <h2>Inventory Management</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-success" onclick="showImportModal()">
+                            <i class="bi bi-upload"></i> Import
+                        </button>
+                        <button class="btn btn-info text-white" onclick="exportInventory()">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                        <button class="btn btn-primary" onclick="showAddItemModal()">
+                            <i class="bi bi-plus-lg"></i> Add Item
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-bar">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" id="inventory-search" placeholder="Search items...">
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="category-filter">
+                                <option value="">All Categories</option>
+                                <option value="stationery">Stationery</option>
+                                <option value="equipment">Equipment</option>
+                                <option value="electronics">Electronics</option>
+                                <option value="furniture">Furniture</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="status-filter">
+                                <option value="">All Status</option>
+                                <option value="Healthy">Healthy</option>
+                                <option value="Low">Low Stock</option>
+                                <option value="Out of Stock">Out of Stock</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="sort-by">
+                                <option value="name">Sort by Name</option>
+                                <option value="stock">Sort by Stock</option>
+                                <option value="usage">Sort by Usage</option>
+                                <option value="status">Sort by Status</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="btn-group w-100">
+                                <button class="btn btn-outline-secondary" id="view-table" onclick="setInventoryView('table')">
+                                    <i class="bi bi-table"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary active" id="view-grid" onclick="setInventoryView('grid')">
+                                    <i class="bi bi-grid"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="showBulkActions()" id="bulk-action-btn" disabled>
+                                    <i class="bi bi-gear"></i> Bulk Actions
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Grid View -->
+                <div class="inventory-grid" id="inventory-grid">
+                </div>
+
+                <!-- Inventory Table View -->
+                <div class="inventory-table d-none" id="inventory-table-container">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Stock</th>
+                                    <th>Reorder Level</th>
+                                    <th>Daily Usage</th>
+                                    <th>Status</th>
+                                    <th>Supplier</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center" id="inventory-pagination">
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Usage Analysis Tab -->
+            <div class="tab-content" id="usage-content">
+                <div class="page-header">
+                    <h2>Usage Analysis</h2>
+                    <div class="header-actions">
+                        <select class="form-select w-auto" id="usage-item-filter">
+                            <option value="">All Items</option>
+                        </select>
+                        <input type="date" class="form-control w-auto" id="usage-date-from">
+                        <input type="date" class="form-control w-auto" id="usage-date-to">
+                        <button class="btn btn-primary" onclick="applyUsageFilters()">Apply</button>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">Monthly Usage Comparison</div>
+                            <div class="card-body">
+                                <canvas id="monthlyUsageChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">Usage by Category</div>
+                            <div class="card-body">
+                                <canvas id="categoryUsageChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Detailed Usage Data</span>
+                                <button class="btn btn-sm btn-outline-primary" onclick="exportUsageData()">
+                                    <i class="bi bi-download"></i> Export
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Item Name</th>
+                                                <th>Category</th>
+                                                <th>Daily Avg</th>
+                                                <th>Weekly Total</th>
+                                                <th>Monthly Total</th>
+                                                <th>Trend</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="usage-detail-table">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forecasting Tab -->
+            <div class="tab-content" id="forecast-content">
+                <div class="page-header">
+                    <h2>Stock Forecasting</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="generateOrderRequest()">
+                            <i class="bi bi-file-earmark-pdf"></i> Generate Order PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">Stockout Predictions</div>
+                            <div class="card-body">
+                                <canvas id="stockoutChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">Reorder Timeline</div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Item</th>
+                                                <th>Current Stock</th>
+                                                <th>Days Left</th>
+                                                <th>Order Date</th>
+                                                <th>Priority</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="forecast-table">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">Order Recommendations</div>
+                            <div class="card-body" id="order-recommendations">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suppliers Tab -->
+            <div class="tab-content" id="suppliers-content">
+                <div class="page-header">
+                    <h2>Supplier Management</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="showAddSupplierModal()">
+                            <i class="bi bi-plus-lg"></i> Add Supplier
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Name</th>
+                                                <th>Contact</th>
+                                                <th>Email</th>
+                                                <th>Phone</th>
+                                                <th>Category</th>
+                                                <th>Rating</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="suppliers-table">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Log Tab -->
+            <div class="tab-content" id="history-content">
+                <div class="page-header">
+                    <h2>Audit Log</h2>
+                    <div class="header-actions">
+                        <input type="date" class="form-control w-auto" id="audit-date-from">
+                        <input type="date" class="form-control w-auto" id="audit-date-to">
+                        <select class="form-select w-auto" id="audit-action-filter">
+                            <option value="">All Actions</option>
+                            <option value="add">Add</option>
+                            <option value="edit">Edit</option>
+                            <option value="delete">Delete</option>
+                            <option value="usage">Usage</option>
+                            <option value="restock">Restock</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="filterAuditLog()">Filter</button>
+                        <button class="btn btn-outline-primary" onclick="exportAuditLog()">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>Action</th>
+                                        <th>Item</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-log-table">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center" id="audit-pagination">
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Reports Tab -->
+            <div class="tab-content" id="reports-content">
+                <div class="page-header">
+                    <h2>Reports</h2>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Generate Reports</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Report Type</label>
+                                    <select class="form-select" id="report-type">
+                                        <option value="inventory">Inventory Status Report</option>
+                                        <option value="usage">Usage Report</option>
+                                        <option value="forecast">Forecast Report</option>
+                                        <option value="supplier">Supplier Report</option>
+                                        <option value="audit">Audit Trail Report</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Date Range</label>
+                                    <div class="row g-2">
+                                        <div class="col">
+                                            <input type="date" class="form-control" id="report-date-from">
+                                        </div>
+                                        <div class="col">
+                                            <input type="date" class="form-control" id="report-date-to">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Export Format</label>
+                                    <select class="form-select" id="report-format">
+                                        <option value="excel">Excel (.xlsx)</option>
+                                        <option value="pdf">PDF</option>
+                                        <option value="csv">CSV</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="generateReport()">
+                                    <i class="bi bi-file-earmark-arrow-down"></i> Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Quick Reports</div>
+                            <div class="card-body">
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-primary" onclick="quickReport('low-stock')">
+                                        <i class="bi bi-exclamation-triangle"></i> Low Stock Items Report
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="quickReport('monthly-usage')">
+                                        <i class="bi bi-graph-up"></i> Monthly Usage Summary
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="quickReport('order')">
+                                        <i class="bi bi-cart"></i> Order Recommendations
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="quickReport('inventory-value')">
+                                        <i class="bi bi-currency-dollar"></i> Inventory Valuation
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="quickReport('supplier-performance')">
+                                        <i class="bi bi-truck"></i> Supplier Performance
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">Report Preview</div>
+                            <div class="card-body" id="report-preview">
+                                <p class="text-muted text-center">Select report options to generate preview</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="tab-content" id="settings-content">
+                <div class="page-header">
+                    <h2>Settings</h2>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">General Settings</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Company Name</label>
+                                    <input type="text" class="form-control" id="company-name" value="My Department">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Default Low Stock Threshold (%)</label>
+                                    <input type="number" class="form-control" id="low-stock-threshold" value="20">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Lead Time (Days)</label>
+                                    <input type="number" class="form-control" id="lead-time" value="7">
+                                </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="auto-reorder" checked>
+                                    <label class="form-check-label">Enable Auto Reorder Alerts</label>
+                                </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="email-notifications" checked>
+                                    <label class="form-check-label">Email Notifications</label>
+                                </div>
+                                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Data Management</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <h6>Backup Data</h6>
+                                    <p class="text-muted small">Export all your data as a backup file</p>
+                                    <button class="btn btn-outline-primary w-100" onclick="backupData()">
+                                        <i class="bi bi-cloud-download"></i> Create Backup
+                                    </button>
+                                </div>
+                                <hr>
+                                <div class="mb-3">
+                                    <h6>Restore Data</h6>
+                                    <p class="text-muted small">Restore from a backup file</p>
+                                    <input type="file" class="form-control mb-2" id="restore-file" accept=".json">
+                                    <button class="btn btn-outline-warning w-100" onclick="restoreData()">
+                                        <i class="bi bi-cloud-upload"></i> Restore Backup
+                                    </button>
+                                </div>
+                                <hr>
+                                <div class="mb-3">
+                                    <h6>Reset Data</h6>
+                                    <p class="text-muted small">Clear all data and start fresh</p>
+                                    <button class="btn btn-outline-danger w-100" onclick="resetData()">
+                                        <i class="bi bi-trash"></i> Reset All Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Appearance</div>
+                            <div class="card-body">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="dark-mode-setting">
+                                    <label class="form-check-label">Dark Mode</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Accent Color</label>
+                                    <input type="color" class="form-control form-control-color" id="accent-color" value="#3498db">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Items Per Page</label>
+                                    <select class="form-select" id="items-per-page">
+                                        <option value="10">10</option>
+                                        <option value="20" selected>20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">About</div>
+                            <div class="card-body">
+                                <h5>Inventory Management System</h5>
+                                <p>Version 2.0.0</p>
+                                <p class="text-muted">Advanced inventory management solution for department champions.</p>
+                                <hr>
+                                <p class="small text-muted mb-0">© 2024 InventoryPro. All rights reserved.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-item-form">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Item Name *</label>
+                                <input type="text" class="form-control" id="item-name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category *</label>
+                                <select class="form-select" id="item-category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="stationery">Stationery</option>
+                                    <option value="equipment">Equipment</option>
+                                    <option value="electronics">Electronics</option>
+                                    <option value="furniture">Furniture</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Initial Stock *</label>
+                                <input type="number" class="form-control" id="initial-stock" min="0" value="0" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Reorder Level *</label>
+                                <input type="number" class="form-control" id="reorder-level" min="1" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Daily Usage *</label>
+                                <input type="number" class="form-control" id="daily-usage-input" min="0" step="0.1" value="0" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Unit Price ($)</label>
+                                <input type="number" class="form-control" id="unit-price" min="0" step="0.01" value="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Supplier</label>
+                                <select class="form-select" id="item-supplier">
+                                    <option value="">Select Supplier</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="item-description" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">SKU/Barcode</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="item-sku">
+                                <button class="btn btn-outline-secondary" type="button" onclick="generateSKU()">
+                                    <i class="bi bi-upc-scan"></i> Generate
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewItem()">Add Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Item Modal -->
+    <div class="modal fade" id="editItemModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-item-form">
+                        <input type="hidden" id="edit-item-id">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Item Name *</label>
+                                <input type="text" class="form-control" id="edit-item-name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category *</label>
+                                <select class="form-select" id="edit-item-category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="stationery">Stationery</option>
+                                    <option value="equipment">Equipment</option>
+                                    <option value="electronics">Electronics</option>
+                                    <option value="furniture">Furniture</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Current Stock *</label>
+                                <input type="number" class="form-control" id="edit-current-stock" min="0" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Reorder Level *</label>
+                                <input type="number" class="form-control" id="edit-reorder-level" min="1" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Daily Usage *</label>
+                                <input type="number" class="form-control" id="edit-daily-usage" min="0" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Unit Price ($)</label>
+                                <input type="number" class="form-control" id="edit-unit-price" min="0" step="0.01">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Supplier</label>
+                                <select class="form-select" id="edit-item-supplier">
+                                    <option value="">Select Supplier</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="edit-item-description" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">SKU/Barcode</label>
+                            <input type="text" class="form-control" id="edit-item-sku">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateItem()">Update Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Record Usage Modal -->
+    <div class="modal fade" id="recordUsageModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-clipboard-check"></i> Record Usage</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="usage-form">
+                        <div class="mb-3">
+                            <label class="form-label">Item *</label>
+                            <select class="form-select" id="usage-item" required>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Quantity Used *</label>
+                            <input type="number" class="form-control" id="usage-quantity" min="1" value="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date *</label>
+                            <input type="date" class="form-control" id="usage-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="usage-notes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="recordUsage()">Record Usage</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restock Modal -->
+    <div class="modal fade" id="restockModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-box-arrow-in-down"></i> Restock Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="restock-form">
+                        <input type="hidden" id="restock-item-id">
+                        <div class="mb-3">
+                            <label class="form-label">Item</label>
+                            <input type="text" class="form-control" id="restock-item-name" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Current Stock</label>
+                            <input type="text" class="form-control" id="restock-current-stock" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Quantity to Add *</label>
+                            <input type="number" class="form-control" id="restock-quantity" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="restock-notes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="restockItem()">Restock</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Supplier Modal -->
+    <div class="modal fade" id="addSupplierModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-truck"></i> Add Supplier</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="supplier-form">
+                        <div class="mb-3">
+                            <label class="form-label">Company Name *</label>
+                            <input type="text" class="form-control" id="supplier-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Contact Person *</label>
+                            <input type="text" class="form-control" id="supplier-contact" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="supplier-email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone *</label>
+                            <input type="tel" class="form-control" id="supplier-phone" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" id="supplier-category">
+                                <option value="general">General</option>
+                                <option value="stationery">Stationery</option>
+                                <option value="equipment">Equipment</option>
+                                <option value="electronics">Electronics</option>
+                                <option value="furniture">Furniture</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control" id="supplier-address" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addSupplier()">Add Supplier</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload"></i> Import Inventory</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Select File (Excel or CSV)</label>
+                        <input type="file" class="form-control" id="import-file" accept=".xlsx,.xls,.csv">
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Expected columns: Name, Category, Stock, Reorder Level, Daily Usage
+                    </div>
+                    <div id="import-preview" class="d-none">
+                        <h6>Preview:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="import-preview-table">
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="importInventory()">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div class="modal fade" id="scanModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-qr-code-scan"></i> Scan QR/Barcode</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="stopScanner()"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="qr-reader" style="width: 100%;"></div>
+                    <div id="scan-result" class="mt-3 d-none">
+                        <div class="alert alert-success">
+                            <strong>Scanned:</strong> <span id="scan-result-text"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications Panel -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="notificationsPanel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title"><i class="bi bi-bell"></i> Notifications</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div id="notifications-list">
+            </div>
+            <button class="btn btn-sm btn-outline-secondary w-100 mt-3" onclick="clearNotifications()">
+                Clear All
+            </button>
+        </div>
+    </div>
+
+    <!-- Item Details Offcanvas -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="itemDetailsPanel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title">Item Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body" id="item-details-content">
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
