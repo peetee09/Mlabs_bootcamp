@@ -63,7 +63,9 @@ async function loadDataFromAPI() {
         throw new Error('API not available');
     }
 
-    inventoryData = await inventoryRes.json();
+    const inventoryResult = await inventoryRes.json();
+    // Handle both paginated and non-paginated responses
+    inventoryData = inventoryResult.items || inventoryResult;
     usageData = await usageRes.json();
     suppliersData = await suppliersRes.json();
     auditLog = await auditRes.json();

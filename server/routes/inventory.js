@@ -3,11 +3,29 @@ const router = express.Router();
 const Inventory = require('../models/Inventory');
 const AuditLog = require('../models/AuditLog');
 
-// Get all inventory items
+// Get all inventory items (with optional pagination)
 router.get('/', async (req, res) => {
     try {
-        const items = await Inventory.find().populate('supplierId');
-        res.json(items);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 100;
+        const skip = (page - 1) * limit;
+
+        const items = await Inventory.find()
+            .populate('supplierId', 'name email phone')
+            .skip(skip)
+            .limit(limit);
+        
+        const total = await Inventory.countDocuments();
+        
+        res.json({
+            items,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -66,14 +66,23 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Delete usage record
+// Delete usage record (restores stock)
 router.delete('/:id', async (req, res) => {
     try {
-        const usage = await Usage.findByIdAndDelete(req.params.id);
+        const usage = await Usage.findById(req.params.id);
         if (!usage) {
             return res.status(404).json({ message: 'Usage record not found' });
         }
-        res.json({ message: 'Usage record deleted' });
+
+        // Restore the stock to the inventory item
+        const item = await Inventory.findById(usage.itemId);
+        if (item) {
+            item.currentStock += usage.quantity;
+            await item.save();
+        }
+
+        await Usage.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Usage record deleted and stock restored' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

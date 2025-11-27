@@ -2,10 +2,17 @@ const express = require('express');
 const router = express.Router();
 const AuditLog = require('../models/AuditLog');
 
-// Get all audit logs
+// Get all audit logs (with pagination)
 router.get('/', async (req, res) => {
     try {
-        const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(500);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 500;
+        const skip = (page - 1) * limit;
+
+        const logs = await AuditLog.find()
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(limit);
         res.json(logs);
     } catch (error) {
         res.status(500).json({ message: error.message });
