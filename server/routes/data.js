@@ -17,7 +17,8 @@ router.delete('/clear-all', async (req, res) => {
         
         res.json({ message: 'All data cleared successfully' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error clearing data:', error.message);
+        res.status(500).json({ message: 'Failed to clear data' });
     }
 });
 

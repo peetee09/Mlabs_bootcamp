@@ -1223,7 +1223,7 @@ async function resetData() {
             throw new Error('Failed to clear database');
         }
     } catch (error) {
-        console.log('API not available, clearing locally only');
+        console.log('Failed to clear server data, proceeding with local storage clearing only:', error.message);
     }
     
     localStorage.clear();
