@@ -1376,67 +1376,67 @@ function toggleDarkMode() {
     saveToStorage(STORAGE_KEYS.SETTINGS, settings);
 }
 
-// ===== SCANNER =====
-let html5QrCode = null;
-
-function startScanner() {
-    html5QrCode = new Html5Qrcode("qr-reader");
+// ===== PC BARCODE SCANNER =====
+function processBarcodeScan() {
+    const barcodeInput = document.getElementById('barcode-input');
+    const barcode = barcodeInput.value.trim();
     
-    const qrCodeSuccessCallback = (decodedText) => {
-        document.getElementById('scan-result').classList.remove('d-none');
-        document.getElementById('scan-result-text').textContent = decodedText;
-        const item = inventoryData.find(i => i.sku === decodedText);
-        if (item) {
-            showEditItemModal(getItemId(item));
-        } else {
-            showToast(`No item found with SKU: ${decodedText}`, 'info');
-        }
-        stopScanner();
-    };
+    if (!barcode) {
+        showToast('Please enter or scan a barcode', 'error');
+        return;
+    }
     
-    // Error callback is intentionally empty as it's called continuously while scanning
-    // and would flood the console with messages for each failed frame scan attempt
-    const qrCodeErrorCallback = () => {};
-    
-    const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 }
-    };
-    
-    html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        qrCodeSuccessCallback,
-        qrCodeErrorCallback
-    ).catch((err) => {
-        console.error('Error starting scanner:', err);
-        showToast('Unable to start camera. Please check camera permissions.', 'error');
-    });
+    handleScannedBarcode(barcode);
 }
 
-function stopScanner() {
-    if (html5QrCode) {
-        html5QrCode.stop()
-            .catch((err) => {
-                console.error('Error stopping scanner:', err);
-            })
-            .finally(() => {
-                html5QrCode = null;
-            });
+function handleScannedBarcode(barcode) {
+    document.getElementById('scan-result').classList.remove('d-none');
+    document.getElementById('scan-result-text').textContent = barcode;
+    
+    const item = inventoryData.find(i => i.sku === barcode);
+    if (item) {
+        // Close the scan modal
+        const scanModal = bootstrap.Modal.getInstance(document.getElementById('scanModal'));
+        if (scanModal) {
+            scanModal.hide();
+        }
+        // Open the edit item modal for the found item
+        showEditItemModal(getItemId(item));
+    } else {
+        showToast(`No item found with SKU: ${barcode}`, 'info');
     }
 }
 
-document.getElementById('scan-btn')?.addEventListener('click', () => {
-    new bootstrap.Modal(document.getElementById('scanModal')).show();
-    setTimeout(startScanner, 500);
-});
+function setupBarcodeScanner() {
+    const barcodeInput = document.getElementById('barcode-input');
+    if (barcodeInput) {
+        // Handle Enter key press (USB scanners typically send Enter after barcode)
+        barcodeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                processBarcodeScan();
+            }
+        });
+    }
+}
 
-// Stop scanner when modal is hidden
-document.getElementById('scanModal')?.addEventListener('hidden.bs.modal', () => {
-    stopScanner();
+// Initialize barcode scanner when modal is shown
+document.getElementById('scanModal')?.addEventListener('shown.bs.modal', () => {
+    const barcodeInput = document.getElementById('barcode-input');
+    if (barcodeInput) {
+        barcodeInput.value = '';
+        barcodeInput.focus();
+    }
     // Reset the scan result display
     document.getElementById('scan-result')?.classList.add('d-none');
 });
+
+document.getElementById('scan-btn')?.addEventListener('click', () => {
+    new bootstrap.Modal(document.getElementById('scanModal')).show();
+});
+
+// Setup barcode scanner event listeners when DOM is ready
+document.addEventListener('DOMContentLoaded', setupBarcodeScanner);
 
 // Utility functions for external calls
 window.showAddItemModal = showAddItemModal;
@@ -1479,4 +1479,4 @@ window.showSettings = () => showTab('settings');
 window.logout = () => showToast('Logout feature coming soon');
 window.showBulkActions = () => showToast('Bulk actions: ' + selectedItems.length + ' items selected');
 window.editSupplier = (id) => showToast('Edit supplier ' + id);
-window.stopScanner = stopScanner;
+window.processBarcodeScan = processBarcodeScan;
