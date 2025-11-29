@@ -98,4 +98,23 @@ router.delete('/item/:itemId', async (req, res) => {
     }
 });
 
+// Clear all usage records
+router.delete('/', async (req, res) => {
+    try {
+        const count = await Usage.countDocuments();
+        await Usage.deleteMany({});
+        
+        // Log audit entry
+        await new AuditLog({
+            action: 'delete',
+            details: `Cleared all usage records (${count} records)`,
+            user: 'Admin'
+        }).save();
+        
+        res.json({ message: 'All usage records cleared', count });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;

@@ -109,4 +109,23 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Clear all suppliers
+router.delete('/', async (req, res) => {
+    try {
+        const count = await Supplier.countDocuments();
+        await Supplier.deleteMany({});
+        
+        // Log audit entry
+        await new AuditLog({
+            action: 'delete',
+            details: `Cleared all suppliers (${count} suppliers)`,
+            user: 'Admin'
+        }).save();
+        
+        res.json({ message: 'All suppliers cleared', count });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;

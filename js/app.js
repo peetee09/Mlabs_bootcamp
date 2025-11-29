@@ -1211,21 +1211,42 @@ function restoreData() {
     reader.readAsText(file);
 }
 
-function resetData() {
-    if (!confirm('This will delete ALL data. Continue?')) return;
+async function resetData() {
+    if (!confirm('This will delete ALL data including data stored in the database. Continue?')) return;
+    
+    // Try to clear data from API
+    try {
+        // Clear data collections first (these log to audit)
+        await Promise.allSettled([
+            fetch(`${API_BASE_URL}/inventory`, { method: 'DELETE' }),
+            fetch(`${API_BASE_URL}/usage`, { method: 'DELETE' }),
+            fetch(`${API_BASE_URL}/suppliers`, { method: 'DELETE' })
+        ]);
+        
+        // Clear audit log last
+        await fetch(`${API_BASE_URL}/audit/clear`, { method: 'DELETE' });
+    } catch (error) {
+        console.log('API not available or error clearing data:', error);
+    }
+    
+    // Clear localStorage
     localStorage.clear();
+    
+    // Reset local arrays
     inventoryData = [];
     usageData = [];
     suppliersData = [];
     auditLog = [];
     notifications = [];
+    
+    // Update UI
     updateDashboard();
     renderInventory();
     renderSuppliers();
     renderAuditLog();
     initializeCharts();
     populateDropdowns();
-    showToast('Data reset', 'success');
+    showToast('All data has been reset', 'success');
 }
 
 // ===== UI HELPERS =====
