@@ -159,4 +159,23 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Clear all inventory items
+router.delete('/', async (req, res) => {
+    try {
+        const count = await Inventory.countDocuments();
+        await Inventory.deleteMany({});
+        
+        // Log audit entry
+        await new AuditLog({
+            action: 'delete',
+            details: `Cleared all inventory items (${count} items)`,
+            user: 'Admin'
+        }).save();
+        
+        res.json({ message: 'All inventory items cleared', count });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;
