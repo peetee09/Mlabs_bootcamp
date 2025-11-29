@@ -4,22 +4,34 @@ const webpush = require('web-push');
 const Subscription = require('../models/Subscription');
 const NotificationRecipient = require('../models/NotificationRecipient');
 
-// VAPID keys for web push - generate new ones for production
-// These are example keys that should be replaced with environment variables
+// VAPID keys for web push - must be set via environment variables in production
+// Generate keys using: npx web-push generate-vapid-keys
 const vapidKeys = {
-    publicKey: process.env.VAPID_PUBLIC_KEY || 'BHxMz9Tb9_m-F-9Z4vOxjQNUEUQ2x3t9d6qFEKJFYxA2HtGGBKCIZU5H7h9y4Z1Z7WqpU0Z8Y0eZ8R1h6Z7W_00',
-    privateKey: process.env.VAPID_PRIVATE_KEY || 'wNhYmz9Kb3_n-C-0N2vJxjMNUCXL1x0_d3qEEKMEYxA'
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY
 };
 
-// Configure web-push
-webpush.setVapidDetails(
-    'mailto:admin@tfg.co.za',
-    vapidKeys.publicKey,
-    vapidKeys.privateKey
-);
+// Warn if VAPID keys are not configured (required for production)
+if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+    console.warn('WARNING: VAPID keys not configured. Push notifications will not work.');
+    console.warn('Generate keys using: npx web-push generate-vapid-keys');
+    console.warn('Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.');
+}
+
+// Configure web-push only if keys are available
+if (vapidKeys.publicKey && vapidKeys.privateKey) {
+    webpush.setVapidDetails(
+        'mailto:admin@tfg.co.za',
+        vapidKeys.publicKey,
+        vapidKeys.privateKey
+    );
+}
 
 // Get VAPID public key for client
 router.get('/vapid-public-key', (req, res) => {
+    if (!vapidKeys.publicKey) {
+        return res.status(503).json({ message: 'Push notifications not configured' });
+    }
     res.json({ publicKey: vapidKeys.publicKey });
 });
 
@@ -286,7 +298,7 @@ router.post('/recipients/seed', async (req, res) => {
         for (const recipient of defaultRecipients) {
             const existing = await NotificationRecipient.findOne({ email: recipient.email.toLowerCase() });
             if (!existing) {
-                const created = await new NotificationRecipient({
+                await new NotificationRecipient({
                     email: recipient.email,
                     name: recipient.name,
                     isActive: true,

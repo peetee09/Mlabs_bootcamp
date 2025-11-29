@@ -86,18 +86,40 @@ self.addEventListener('pushsubscriptionchange', function(event) {
     console.log('[Service Worker] Push Subscription Change');
     
     event.waitUntil(
-        self.registration.pushManager.subscribe({
-            userVisibleOnly: true
-        }).then(function(subscription) {
-            // Send new subscription to server
-            return fetch('/api/notifications/subscribe', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ subscription })
-            });
-        })
+        // First get the VAPID public key from the server
+        fetch('/api/notifications/vapid-public-key')
+            .then(response => response.json())
+            .then(data => {
+                // Convert VAPID key to Uint8Array
+                const padding = '='.repeat((4 - data.publicKey.length % 4) % 4);
+                const base64 = (data.publicKey + padding)
+                    .replace(/-/g, '+')
+                    .replace(/_/g, '/');
+                const rawData = atob(base64);
+                const applicationServerKey = new Uint8Array(rawData.length);
+                for (let i = 0; i < rawData.length; ++i) {
+                    applicationServerKey[i] = rawData.charCodeAt(i);
+                }
+                
+                // Subscribe with the application server key
+                return self.registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+            })
+            .then(function(subscription) {
+                // Send new subscription to server
+                return fetch('/api/notifications/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ subscription })
+                });
+            })
+            .catch(function(error) {
+                console.error('[Service Worker] Failed to resubscribe:', error);
+            })
     );
 });
 

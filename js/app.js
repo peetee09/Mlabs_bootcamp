@@ -1343,7 +1343,7 @@ async function loadNotificationRecipients() {
             renderNotificationRecipients();
         }
     } catch (error) {
-        console.log('Failed to load notification recipients:', error);
+        console.error('Failed to load notification recipients:', error);
         notificationRecipients = [];
     }
 }
@@ -1504,9 +1504,14 @@ async function testPushNotification() {
     }
 }
 
-// Edit recipient (simple toggle for now)
-function editRecipient(id) {
+// Toggle recipient active status (used by edit button)
+function toggleRecipientStatus(id) {
     toggleRecipientActive(id);
+}
+
+// Alias for backward compatibility
+function editRecipient(id) {
+    toggleRecipientStatus(id);
 }
 
 // ===== REPORTS & EXPORTS =====
@@ -2009,5 +2014,6 @@ window.unsubscribeFromPushNotifications = unsubscribeFromPushNotifications;
 window.addNotificationRecipient = addNotificationRecipient;
 window.deleteRecipient = deleteRecipient;
 window.editRecipient = editRecipient;
+window.toggleRecipientStatus = toggleRecipientStatus;
 window.seedDefaultRecipients = seedDefaultRecipients;
 window.testPushNotification = testPushNotification;
