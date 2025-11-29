@@ -44,6 +44,9 @@ async function initializeApp() {
     setupEventListeners();
     checkLowStockAlerts();
     loadSettings();
+    
+    // Initialize push notifications
+    initializePushNotifications();
 }
 
 // ===== API FUNCTIONS =====
@@ -1110,14 +1113,20 @@ function checkLowStockAlerts() {
         const itemId = getItemId(item);
         const existing = notifications.find(n => n.itemId === itemId && !n.read);
         if (!existing) {
+            const isOutOfStock = getItemStatus(item) === 'Out of Stock';
             notifications.push({
                 id: generateId(notifications),
                 itemId: itemId,
-                title: getItemStatus(item) === 'Out of Stock' ? 'Out of Stock!' : 'Low Stock Warning',
+                title: isOutOfStock ? 'Out of Stock!' : 'Low Stock Warning',
                 message: `${item.name} needs attention (${item.currentStock} left)`,
                 timestamp: new Date().toISOString(),
                 read: false
             });
+            
+            // Send push notification for new alerts
+            if (pushSubscription) {
+                sendStockAlert(item, isOutOfStock ? 'out-of-stock' : 'low-stock');
+            }
         }
     });
     saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
@@ -1160,6 +1169,344 @@ function clearNotifications() {
     saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
     updateNotificationCount();
     renderNotifications();
+}
+
+// ===== PUSH NOTIFICATIONS =====
+let pushSubscription = null;
+let notificationRecipients = [];
+
+// Check if push notifications are supported
+function isPushNotificationSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window;
+}
+
+// Initialize push notifications
+async function initializePushNotifications() {
+    if (!isPushNotificationSupported()) {
+        console.log('Push notifications not supported');
+        updatePushNotificationUI(false, 'Not supported');
+        return;
+    }
+
+    try {
+        // Register service worker
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        console.log('Service Worker registered:', registration);
+
+        // Check if already subscribed
+        pushSubscription = await registration.pushManager.getSubscription();
+        
+        if (pushSubscription) {
+            console.log('Already subscribed to push notifications');
+            updatePushNotificationUI(true, 'Enabled');
+        } else {
+            updatePushNotificationUI(false, 'Disabled');
+        }
+
+        // Load notification recipients
+        await loadNotificationRecipients();
+    } catch (error) {
+        console.error('Failed to initialize push notifications:', error);
+        updatePushNotificationUI(false, 'Error');
+    }
+}
+
+// Subscribe to push notifications
+async function subscribeToPushNotifications() {
+    if (!isPushNotificationSupported()) {
+        showToast('Push notifications are not supported in this browser', 'error');
+        return;
+    }
+
+    try {
+        // Request notification permission
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            showToast('Notification permission denied', 'error');
+            return;
+        }
+
+        // Get VAPID public key from server
+        const vapidResponse = await fetch(`${API_BASE_URL}/notifications/vapid-public-key`);
+        const { publicKey } = await vapidResponse.json();
+
+        // Get service worker registration
+        const registration = await navigator.serviceWorker.ready;
+
+        // Subscribe to push
+        pushSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+
+        // Send subscription to server
+        await fetch(`${API_BASE_URL}/notifications/subscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: pushSubscription })
+        });
+
+        updatePushNotificationUI(true, 'Enabled');
+        showToast('Push notifications enabled!', 'success');
+    } catch (error) {
+        console.error('Failed to subscribe to push notifications:', error);
+        showToast('Failed to enable push notifications', 'error');
+    }
+}
+
+// Unsubscribe from push notifications
+async function unsubscribeFromPushNotifications() {
+    try {
+        if (pushSubscription) {
+            await pushSubscription.unsubscribe();
+            
+            // Notify server
+            await fetch(`${API_BASE_URL}/notifications/unsubscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ endpoint: pushSubscription.endpoint })
+            });
+
+            pushSubscription = null;
+            updatePushNotificationUI(false, 'Disabled');
+            showToast('Push notifications disabled', 'info');
+        }
+    } catch (error) {
+        console.error('Failed to unsubscribe:', error);
+        showToast('Failed to disable push notifications', 'error');
+    }
+}
+
+// Toggle push notifications
+async function togglePushNotifications() {
+    if (pushSubscription) {
+        await unsubscribeFromPushNotifications();
+    } else {
+        await subscribeToPushNotifications();
+    }
+}
+
+// Update UI based on push notification status
+function updatePushNotificationUI(enabled, statusText) {
+    const toggle = document.getElementById('push-notifications-toggle');
+    const status = document.getElementById('push-status');
+    
+    if (toggle) {
+        toggle.checked = enabled;
+    }
+    if (status) {
+        status.textContent = statusText;
+        status.className = `badge ${enabled ? 'bg-success' : 'bg-secondary'}`;
+    }
+}
+
+// Convert VAPID key to Uint8Array
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+// Send stock alert via push notification
+async function sendStockAlert(item, alertType) {
+    try {
+        await fetch(`${API_BASE_URL}/notifications/stock-alert`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                itemName: item.name,
+                currentStock: item.currentStock,
+                alertType: alertType,
+                reorderLevel: item.reorderLevel
+            })
+        });
+    } catch (error) {
+        console.error('Failed to send stock alert:', error);
+    }
+}
+
+// Load notification recipients from server
+async function loadNotificationRecipients() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/recipients`);
+        if (response.ok) {
+            notificationRecipients = await response.json();
+            renderNotificationRecipients();
+        }
+    } catch (error) {
+        console.log('Failed to load notification recipients:', error);
+        notificationRecipients = [];
+    }
+}
+
+// Render notification recipients list
+function renderNotificationRecipients() {
+    const container = document.getElementById('notification-recipients-list');
+    if (!container) return;
+
+    if (notificationRecipients.length === 0) {
+        container.innerHTML = '<p class="text-muted">No notification recipients configured</p>';
+        return;
+    }
+
+    container.innerHTML = notificationRecipients.map(r => `
+        <div class="recipient-item d-flex justify-content-between align-items-center py-2 border-bottom">
+            <div>
+                <strong>${r.name || 'N/A'}</strong>
+                <br><small class="text-muted">${r.email}</small>
+                <br>
+                <span class="badge ${r.isActive ? 'bg-success' : 'bg-secondary'}">${r.isActive ? 'Active' : 'Inactive'}</span>
+                ${r.notifyOnLowStock ? '<span class="badge bg-warning ms-1">Low Stock</span>' : ''}
+                ${r.notifyOnOutOfStock ? '<span class="badge bg-danger ms-1">Out of Stock</span>' : ''}
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editRecipient('${r._id}')">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecipient('${r._id}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Add new notification recipient
+async function addNotificationRecipient() {
+    const email = document.getElementById('new-recipient-email')?.value?.trim();
+    const name = document.getElementById('new-recipient-name')?.value?.trim();
+
+    if (!email) {
+        showToast('Email is required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/recipients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                email, 
+                name,
+                notifyOnLowStock: true,
+                notifyOnOutOfStock: true
+            })
+        });
+
+        if (response.ok) {
+            const recipient = await response.json();
+            notificationRecipients.push(recipient);
+            renderNotificationRecipients();
+            
+            // Clear form
+            document.getElementById('new-recipient-email').value = '';
+            document.getElementById('new-recipient-name').value = '';
+            
+            showToast('Recipient added successfully', 'success');
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to add recipient', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to add recipient:', error);
+        showToast('Failed to add recipient', 'error');
+    }
+}
+
+// Delete notification recipient
+async function deleteRecipient(id) {
+    if (!confirm('Delete this notification recipient?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/recipients/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            notificationRecipients = notificationRecipients.filter(r => r._id !== id);
+            renderNotificationRecipients();
+            showToast('Recipient deleted', 'success');
+        }
+    } catch (error) {
+        console.error('Failed to delete recipient:', error);
+        showToast('Failed to delete recipient', 'error');
+    }
+}
+
+// Toggle recipient active status
+async function toggleRecipientActive(id) {
+    const recipient = notificationRecipients.find(r => r._id === id);
+    if (!recipient) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/recipients/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: !recipient.isActive })
+        });
+
+        if (response.ok) {
+            recipient.isActive = !recipient.isActive;
+            renderNotificationRecipients();
+            showToast(`Recipient ${recipient.isActive ? 'activated' : 'deactivated'}`, 'success');
+        }
+    } catch (error) {
+        console.error('Failed to toggle recipient:', error);
+    }
+}
+
+// Seed default recipients
+async function seedDefaultRecipients() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/recipients/seed`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            await loadNotificationRecipients();
+            showToast('Default recipients added', 'success');
+        }
+    } catch (error) {
+        console.error('Failed to seed recipients:', error);
+        showToast('Failed to add default recipients', 'error');
+    }
+}
+
+// Test push notification
+async function testPushNotification() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: '🧪 Test Notification',
+                body: 'Push notifications are working correctly!',
+                data: { type: 'test' }
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`Test notification sent to ${result.successful} subscriber(s)`, 'success');
+        }
+    } catch (error) {
+        console.error('Failed to send test notification:', error);
+        showToast('Failed to send test notification', 'error');
+    }
+}
+
+// Edit recipient (simple toggle for now)
+function editRecipient(id) {
+    toggleRecipientActive(id);
 }
 
 // ===== REPORTS & EXPORTS =====
@@ -1654,3 +2001,13 @@ window.processBarcodeScan = processBarcodeScan;
 window.viewInventory = viewInventory;
 window.viewUsage = viewUsage;
 window.stopScanner = stopScanner;
+
+// Push notification functions
+window.togglePushNotifications = togglePushNotifications;
+window.subscribeToPushNotifications = subscribeToPushNotifications;
+window.unsubscribeFromPushNotifications = unsubscribeFromPushNotifications;
+window.addNotificationRecipient = addNotificationRecipient;
+window.deleteRecipient = deleteRecipient;
+window.editRecipient = editRecipient;
+window.seedDefaultRecipients = seedDefaultRecipients;
+window.testPushNotification = testPushNotification;
