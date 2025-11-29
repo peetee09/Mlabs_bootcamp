@@ -58,6 +58,7 @@ app.use('/api/usage', require('./routes/usage'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/audit', require('./routes/audit'));
 app.use('/api/data', require('./routes/data'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Serve index.html for root path
 app.get('/', (req, res) => {
