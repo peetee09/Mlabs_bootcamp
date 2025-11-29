@@ -1167,10 +1167,11 @@ function updateCharts() {
         
         // Highlight the peak day with a different color
         const maxUsage = Math.max(...usageValues);
-        const minUsage = Math.min(...usageValues);
+        const nonZeroValues = usageValues.filter(v => v > 0);
+        const minNonZeroUsage = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : 0;
         const pointColors = usageValues.map(val => {
             if (val === maxUsage && maxUsage > 0) return '#e74c3c';
-            if (val === minUsage && usageValues.some(v => v > 0)) return '#2ecc71';
+            if (val === minNonZeroUsage && minNonZeroUsage > 0) return '#2ecc71';
             return '#3498db';
         });
         window.usageTrendChart.data.datasets[0].pointBackgroundColor = pointColors;
@@ -1212,7 +1213,10 @@ function updatePeakIndicator(days, usageByDay, dayLabels) {
     }
 
     const maxEntry = usageEntries.reduce((max, e) => e.usage > max.usage ? e : max, usageEntries[0]);
-    const minEntry = usageEntries.filter(e => e.usage > 0).reduce((min, e) => e.usage < min.usage ? e : min, usageEntries.find(e => e.usage > 0) || usageEntries[0]);
+    const nonZeroEntries = usageEntries.filter(e => e.usage > 0);
+    const minEntry = nonZeroEntries.length > 0 
+        ? nonZeroEntries.reduce((min, e) => e.usage < min.usage ? e : min, nonZeroEntries[0])
+        : maxEntry;
     const avgUsage = (totalUsage / days.length).toFixed(1);
 
     container.innerHTML = `
