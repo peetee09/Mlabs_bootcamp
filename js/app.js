@@ -30,13 +30,9 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeApp() {
     try {
         await loadDataFromAPI();
-        if (inventoryData.length === 0) {
-            await loadSampleData();
-        }
     } catch (error) {
         console.log('API not available, falling back to localStorage');
         loadDataFromStorage();
-        if (inventoryData.length === 0) loadSampleDataLocal();
     }
     
     updateDashboard();
@@ -1223,8 +1219,12 @@ function resetData() {
     suppliersData = [];
     auditLog = [];
     notifications = [];
-    loadSampleData();
-    initializeApp();
+    updateDashboard();
+    renderInventory();
+    renderSuppliers();
+    renderAuditLog();
+    initializeCharts();
+    populateDropdowns();
     showToast('Data reset', 'success');
 }
 
