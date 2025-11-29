@@ -968,8 +968,31 @@ function initializeCharts() {
     if (usageCtx) {
         window.usageTrendChart = new Chart(usageCtx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'Daily Usage', data: [], borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', fill: true, tension: 0.3 }] },
-            options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            data: { labels: [], datasets: [{ label: 'Daily Usage', data: [], borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#3498db' }] },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        callbacks: {
+                            label: function(context) {
+                                return `Usage: ${context.raw} units`;
+                            }
+                        }
+                    }
+                }, 
+                scales: { 
+                    y: { 
+                        beginAtZero: true,
+                        ticks: { font: { size: 10 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 10 } }
+                    }
+                }
+            }
         });
     }
 
@@ -1003,11 +1026,29 @@ function updateCharts() {
         if (usageByDay[key] !== undefined) usageByDay[key] += record.quantity;
     });
 
+    const usageValues = last7Days.map(d => usageByDay[d]);
+    const dayLabels = last7Days.map(d => new Date(d).toLocaleDateString('en', { weekday: 'short' }));
+
     if (window.usageTrendChart) {
-        window.usageTrendChart.data.labels = last7Days.map(d => new Date(d).toLocaleDateString('en', { weekday: 'short' }));
-        window.usageTrendChart.data.datasets[0].data = last7Days.map(d => usageByDay[d]);
+        window.usageTrendChart.data.labels = dayLabels;
+        window.usageTrendChart.data.datasets[0].data = usageValues;
+        
+        // Highlight the peak day with a different color
+        const maxUsage = Math.max(...usageValues);
+        const nonZeroValues = usageValues.filter(v => v > 0);
+        const minNonZeroUsage = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : 0;
+        const pointColors = usageValues.map(val => {
+            if (val === maxUsage && maxUsage > 0) return '#e74c3c';
+            if (val === minNonZeroUsage && minNonZeroUsage > 0) return '#2ecc71';
+            return '#3498db';
+        });
+        window.usageTrendChart.data.datasets[0].pointBackgroundColor = pointColors;
+        window.usageTrendChart.data.datasets[0].pointBorderColor = pointColors;
         window.usageTrendChart.update();
     }
+
+    // Update peak usage indicator
+    updatePeakIndicator(last7Days, usageByDay, dayLabels);
 
     // Update category chart
     const categories = {};
@@ -1020,6 +1061,46 @@ function updateCharts() {
         window.categoryChart.data.datasets[0].data = Object.values(categories);
         window.categoryChart.update();
     }
+}
+
+function updatePeakIndicator(days, usageByDay, dayLabels) {
+    const container = document.getElementById('usage-peak-indicator');
+    if (!container) return;
+
+    const usageEntries = days.map((day, idx) => ({
+        day: dayLabels[idx],
+        usage: usageByDay[day],
+        date: day
+    }));
+
+    const totalUsage = usageEntries.reduce((sum, e) => sum + e.usage, 0);
+    
+    if (totalUsage === 0) {
+        container.innerHTML = '<span class="text-muted">No usage data for the selected period</span>';
+        return;
+    }
+
+    const maxEntry = usageEntries.reduce((max, e) => e.usage > max.usage ? e : max, usageEntries[0]);
+    const nonZeroEntries = usageEntries.filter(e => e.usage > 0);
+    const minEntry = nonZeroEntries.length > 0 
+        ? nonZeroEntries.reduce((min, e) => e.usage < min.usage ? e : min, nonZeroEntries[0])
+        : maxEntry;
+    const avgUsage = (totalUsage / days.length).toFixed(1);
+
+    container.innerHTML = `
+        <span class="peak-item highest" title="Highest usage day">
+            <i class="bi bi-arrow-up-circle-fill"></i>
+            Peak: ${maxEntry.day} (${maxEntry.usage} units)
+        </span>
+        <span class="peak-item lowest" title="Lowest usage day">
+            <i class="bi bi-arrow-down-circle-fill"></i>
+            Low: ${minEntry.day} (${minEntry.usage} units)
+        </span>
+        <span class="peak-item" title="Average daily usage">
+            <i class="bi bi-bar-chart-fill"></i>
+            Avg: ${avgUsage} units/day
+        </span>
+    `;
 }
 
 // ===== NOTIFICATIONS =====

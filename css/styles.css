@@ -951,3 +951,45 @@ body {
     font-size: 0.7rem;
     padding: 3px 8px;
 }
+
+/* Usage Peak Indicator */
+.usage-peak-indicator {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.75rem;
+    padding: 6px 0;
+    border-top: 1px solid #eee;
+}
+
+[data-theme="dark"] .usage-peak-indicator {
+    border-color: var(--border-color);
+}
+
+.usage-peak-indicator .peak-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--light-bg);
+    border-radius: 12px;
+}
+
+[data-theme="dark"] .usage-peak-indicator .peak-item {
+    background: var(--dark-bg);
+}
+
+.usage-peak-indicator .peak-item.highest {
+    background: rgba(231, 76, 60, 0.15);
+    color: var(--danger-color);
+    font-weight: 600;
+}
+
+.usage-peak-indicator .peak-item.lowest {
+    background: rgba(46, 204, 113, 0.15);
+    color: var(--success-color);
+}
+
+.usage-peak-indicator .peak-item i {
+    font-size: 0.8rem;
+}
