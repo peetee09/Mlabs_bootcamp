@@ -30,13 +30,9 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeApp() {
     try {
         await loadDataFromAPI();
-        if (inventoryData.length === 0) {
-            await loadSampleData();
-        }
     } catch (error) {
         console.log('API not available, falling back to localStorage');
         loadDataFromStorage();
-        if (inventoryData.length === 0) loadSampleDataLocal();
     }
     
     updateDashboard();
@@ -1393,16 +1389,33 @@ function restoreData() {
     reader.readAsText(file);
 }
 
-function resetData() {
+async function resetData() {
     if (!confirm('This will delete ALL data. Continue?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/data/clear-all`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to clear database');
+        }
+    } catch (error) {
+        console.log('Failed to clear server data, proceeding with local storage clearing only:', error.message);
+    }
+    
     localStorage.clear();
     inventoryData = [];
     usageData = [];
     suppliersData = [];
     auditLog = [];
     notifications = [];
-    loadSampleData();
-    initializeApp();
+    updateDashboard();
+    renderInventory();
+    renderSuppliers();
+    renderAuditLog();
+    initializeCharts();
+    populateDropdowns();
     showToast('Data reset', 'success');
 }
 
@@ -1568,22 +1581,61 @@ let html5QrCode = null;
 
 function startScanner() {
     html5QrCode = new Html5Qrcode("qr-reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (decodedText) => {
+    
+    const qrCodeSuccessCallback = (decodedText) => {
         document.getElementById('scan-result').classList.remove('d-none');
         document.getElementById('scan-result-text').textContent = decodedText;
         const item = inventoryData.find(i => i.sku === decodedText);
-        if (item) showEditItemModal(item.id);
+        if (item) {
+            showEditItemModal(getItemId(item));
+        } else {
+            showToast(`No item found with SKU: ${decodedText}`, 'info');
+        }
         stopScanner();
+    };
+    
+    // Error callback is intentionally empty as it's called continuously while scanning
+    // and would flood the console with messages for each failed frame scan attempt
+    const qrCodeErrorCallback = () => {};
+    
+    const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 }
+    };
+    
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        qrCodeSuccessCallback,
+        qrCodeErrorCallback
+    ).catch((err) => {
+        console.error('Error starting scanner:', err);
+        showToast('Unable to start camera. Please check camera permissions.', 'error');
     });
 }
 
 function stopScanner() {
-    if (html5QrCode) html5QrCode.stop().catch(() => {});
+    if (html5QrCode) {
+        html5QrCode.stop()
+            .catch((err) => {
+                console.error('Error stopping scanner:', err);
+            })
+            .finally(() => {
+                html5QrCode = null;
+            });
+    }
 }
 
 document.getElementById('scan-btn')?.addEventListener('click', () => {
     new bootstrap.Modal(document.getElementById('scanModal')).show();
     setTimeout(startScanner, 500);
+});
+
+// Stop scanner when modal is hidden
+document.getElementById('scanModal')?.addEventListener('hidden.bs.modal', () => {
+    stopScanner();
+    // Reset the scan result display
+    document.getElementById('scan-result')?.classList.add('d-none');
 });
 
 // Utility functions for external calls
@@ -1629,3 +1681,4 @@ window.showBulkActions = () => showToast('Bulk actions: ' + selectedItems.length
 window.editSupplier = (id) => showToast('Edit supplier ' + id);
 window.viewInventory = viewInventory;
 window.viewUsage = viewUsage;
+window.stopScanner = stopScanner;
