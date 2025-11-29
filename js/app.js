@@ -356,7 +356,7 @@ function generateRecommendations() {
             icon: 'clock-history',
             title: 'Stock Running Low',
             text: `${criticalItems.length} item(s) will run out within a week. Consider restocking: ${criticalItems.slice(0, 2).map(i => i.name).join(', ')}`,
-            action: { label: 'View Items', handler: "showTab('inventory')" },
+            action: { label: 'View Items', handler: 'viewInventory' },
             priority: 2
         });
     }
@@ -385,7 +385,7 @@ function generateRecommendations() {
             icon: 'graph-up',
             title: 'High Consumption Items',
             text: `${highUsageItems.length} item(s) have high daily usage. Consider bulk ordering or negotiating better rates with suppliers.`,
-            action: { label: 'View Usage', handler: "showTab('usage')" },
+            action: { label: 'View Usage', handler: 'viewUsage' },
             priority: 3
         });
     }
@@ -415,6 +415,15 @@ function generateRecommendations() {
     }
     
     return recommendations.sort((a, b) => a.priority - b.priority).slice(0, 3);
+}
+
+// Helper functions for recommendation actions
+function viewInventory() {
+    showTab('inventory');
+}
+
+function viewUsage() {
+    showTab('usage');
 }
 
 function renderRecommendations() {
@@ -1618,3 +1627,5 @@ window.showSettings = () => showTab('settings');
 window.logout = () => showToast('Logout feature coming soon');
 window.showBulkActions = () => showToast('Bulk actions: ' + selectedItems.length + ' items selected');
 window.editSupplier = (id) => showToast('Edit supplier ' + id);
+window.viewInventory = viewInventory;
+window.viewUsage = viewUsage;
