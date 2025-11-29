@@ -266,6 +266,39 @@ function generateSKU() {
     document.getElementById('item-sku').value = sku;
 }
 
+// ===== PERFORMANCE OPTIMIZATION =====
+// Debounce function for search input
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Memoization cache for filtered inventory
+let filterCache = {
+    key: '',
+    result: []
+};
+
+function getCacheKey() {
+    const search = document.getElementById('inventory-search')?.value?.toLowerCase() || '';
+    const category = document.getElementById('category-filter')?.value || '';
+    const status = document.getElementById('status-filter')?.value || '';
+    const sortBy = document.getElementById('sort-by')?.value || 'name';
+    return `${search}|${category}|${status}|${sortBy}|${inventoryData.length}`;
+}
+
+function invalidateFilterCache() {
+    filterCache.key = '';
+    filterCache.result = [];
+}
+
 // ===== DASHBOARD =====
 function updateDashboard() {
     const totalItems = inventoryData.length;
@@ -281,6 +314,7 @@ function updateDashboard() {
     renderLowStockTable();
     renderRecentActivity();
     renderTopUsedItems();
+    renderRecommendations();
     updateNotificationCount();
 }
 
@@ -288,6 +322,135 @@ function refreshDashboard() {
     updateDashboard();
     if (window.usageTrendChart) updateCharts();
     showToast('Dashboard refreshed', 'success');
+}
+
+// ===== RECOMMENDATIONS SYSTEM =====
+function generateRecommendations() {
+    const recommendations = [];
+    
+    // Check for out of stock items - Critical
+    const outOfStockItems = inventoryData.filter(i => getItemStatus(i) === "Out of Stock");
+    if (outOfStockItems.length > 0) {
+        recommendations.push({
+            type: 'warning',
+            icon: 'exclamation-triangle',
+            title: 'Urgent: Items Out of Stock',
+            text: `${outOfStockItems.length} item(s) are out of stock and need immediate reordering: ${outOfStockItems.slice(0, 3).map(i => i.name).join(', ')}${outOfStockItems.length > 3 ? '...' : ''}`,
+            action: { label: 'Reorder Now', handler: 'generateOrderRequest' },
+            priority: 1
+        });
+    }
+    
+    // Check for items running low (will run out within 7 days)
+    const criticalItems = inventoryData.filter(i => {
+        const days = getDaysUntilStockout(i);
+        return days !== Infinity && days <= 7 && getItemStatus(i) !== "Out of Stock";
+    });
+    if (criticalItems.length > 0) {
+        recommendations.push({
+            type: 'warning',
+            icon: 'clock-history',
+            title: 'Stock Running Low',
+            text: `${criticalItems.length} item(s) will run out within a week. Consider restocking: ${criticalItems.slice(0, 2).map(i => i.name).join(', ')}`,
+            action: { label: 'View Items', handler: 'viewInventory' },
+            priority: 2
+        });
+    }
+    
+    // Optimize reorder levels based on usage patterns
+    const underutilizedItems = inventoryData.filter(i => {
+        const daysStock = getDaysUntilStockout(i);
+        return daysStock !== Infinity && daysStock > 90 && i.currentStock > i.reorderLevel * 3;
+    });
+    if (underutilizedItems.length > 0) {
+        recommendations.push({
+            type: 'info',
+            icon: 'lightbulb',
+            title: 'Optimize Stock Levels',
+            text: `${underutilizedItems.length} item(s) have excess stock (90+ days). Consider reducing reorder quantities to free up storage.`,
+            action: null,
+            priority: 4
+        });
+    }
+    
+    // High usage items recommendation
+    const highUsageItems = inventoryData.filter(i => i.dailyUsage > 5);
+    if (highUsageItems.length > 0) {
+        recommendations.push({
+            type: 'info',
+            icon: 'graph-up',
+            title: 'High Consumption Items',
+            text: `${highUsageItems.length} item(s) have high daily usage. Consider bulk ordering or negotiating better rates with suppliers.`,
+            action: { label: 'View Usage', handler: 'viewUsage' },
+            priority: 3
+        });
+    }
+    
+    // If inventory is healthy, show positive feedback
+    if (recommendations.length === 0 && inventoryData.length > 0) {
+        recommendations.push({
+            type: 'success',
+            icon: 'check-circle',
+            title: 'Inventory Health: Excellent',
+            text: 'All stock levels are healthy. No immediate actions required.',
+            action: null,
+            priority: 5
+        });
+    }
+    
+    // System optimization tip
+    if (inventoryData.length > 0 && suppliersData.length === 0) {
+        recommendations.push({
+            type: 'info',
+            icon: 'truck',
+            title: 'Add Suppliers',
+            text: 'Link items to suppliers for better order management and tracking.',
+            action: { label: 'Add Supplier', handler: 'showAddSupplierModal' },
+            priority: 6
+        });
+    }
+    
+    return recommendations.sort((a, b) => a.priority - b.priority).slice(0, 3);
+}
+
+// Helper functions for recommendation actions
+function viewInventory() {
+    showTab('inventory');
+}
+
+function viewUsage() {
+    showTab('usage');
+}
+
+function renderRecommendations() {
+    const container = document.getElementById('recommendations-container');
+    if (!container) return;
+    
+    const recommendations = generateRecommendations();
+    
+    if (recommendations.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.innerHTML = recommendations.map(rec => `
+        <div class="recommendation-card ${rec.type}">
+            <div class="rec-icon ${rec.type}">
+                <i class="bi bi-${rec.icon}"></i>
+            </div>
+            <div class="rec-content">
+                <div class="rec-title">${rec.title}</div>
+                <p class="rec-text">${rec.text}</p>
+            </div>
+            ${rec.action ? `
+            <div class="rec-action">
+                <button class="btn btn-sm btn-outline-primary" onclick="${rec.action.handler}()">
+                    ${rec.action.label}
+                </button>
+            </div>
+            ` : ''}
+        </div>
+    `).join('');
 }
 
 function renderLowStockTable() {
@@ -383,6 +546,12 @@ function renderInventory() {
 }
 
 function getFilteredInventory() {
+    // Use cache if available
+    const cacheKey = getCacheKey();
+    if (filterCache.key === cacheKey) {
+        return filterCache.result;
+    }
+    
     let filtered = [...inventoryData];
     const search = document.getElementById('inventory-search')?.value?.toLowerCase() || '';
     const category = document.getElementById('category-filter')?.value || '';
@@ -402,6 +571,10 @@ function getFilteredInventory() {
         }
     });
 
+    // Store in cache
+    filterCache.key = cacheKey;
+    filterCache.result = filtered;
+    
     return filtered;
 }
 
@@ -565,6 +738,7 @@ async function addNewItem() {
     }
     
     bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
+    invalidateFilterCache();
     updateDashboard();
     renderInventory();
     populateDropdowns();
@@ -633,6 +807,7 @@ async function updateItem() {
     }
 
     bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide();
+    invalidateFilterCache();
     updateDashboard();
     renderInventory();
     showToast('Item updated successfully', 'success');
@@ -663,6 +838,7 @@ async function deleteItem(id) {
         saveAllData();
     }
 
+    invalidateFilterCache();
     updateDashboard();
     renderInventory();
     populateDropdowns();
@@ -721,6 +897,7 @@ async function recordUsage() {
     }
 
     bootstrap.Modal.getInstance(document.getElementById('recordUsageModal')).hide();
+    invalidateFilterCache();
     updateDashboard();
     renderInventory();
     checkLowStockAlerts();
@@ -774,6 +951,7 @@ async function restockItem() {
     }
 
     bootstrap.Modal.getInstance(document.getElementById('restockModal')).hide();
+    invalidateFilterCache();
     updateDashboard();
     renderInventory();
     showToast('Item restocked', 'success');
@@ -1344,6 +1522,20 @@ function toggleSelectAll() {
 }
 
 // ===== EVENT LISTENERS =====
+// Debounced search handler for performance
+const debouncedSearch = debounce(() => {
+    currentPage = 1;
+    renderInventory();
+}, 250);
+
+const debouncedGlobalSearch = debounce((query) => {
+    if (query.length > 2) {
+        document.getElementById('inventory-search').value = query;
+        showTab('inventory');
+        renderInventory();
+    }
+}, 300);
+
 function setupEventListeners() {
     // Sidebar navigation
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
@@ -1364,20 +1556,15 @@ function setupEventListeners() {
         new bootstrap.Offcanvas(document.getElementById('notificationsPanel')).show();
     });
 
-    // Search and filters
-    document.getElementById('inventory-search')?.addEventListener('input', () => { currentPage = 1; renderInventory(); });
-    document.getElementById('category-filter')?.addEventListener('change', () => { currentPage = 1; renderInventory(); });
-    document.getElementById('status-filter')?.addEventListener('change', () => { currentPage = 1; renderInventory(); });
-    document.getElementById('sort-by')?.addEventListener('change', renderInventory);
+    // Search and filters with debouncing for better performance
+    document.getElementById('inventory-search')?.addEventListener('input', debouncedSearch);
+    document.getElementById('category-filter')?.addEventListener('change', () => { currentPage = 1; invalidateFilterCache(); renderInventory(); });
+    document.getElementById('status-filter')?.addEventListener('change', () => { currentPage = 1; invalidateFilterCache(); renderInventory(); });
+    document.getElementById('sort-by')?.addEventListener('change', () => { invalidateFilterCache(); renderInventory(); });
 
-    // Global search
+    // Global search with debouncing
     document.getElementById('global-search')?.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        if (query.length > 2) {
-            document.getElementById('inventory-search').value = query;
-            showTab('inventory');
-            renderInventory();
-        }
+        debouncedGlobalSearch(e.target.value.toLowerCase());
     });
 }
 
@@ -1492,4 +1679,6 @@ window.showSettings = () => showTab('settings');
 window.logout = () => showToast('Logout feature coming soon');
 window.showBulkActions = () => showToast('Bulk actions: ' + selectedItems.length + ' items selected');
 window.editSupplier = (id) => showToast('Edit supplier ' + id);
+window.viewInventory = viewInventory;
+window.viewUsage = viewUsage;
 window.stopScanner = stopScanner;
