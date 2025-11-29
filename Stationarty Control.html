@@ -446,97 +446,12 @@
         
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
-            loadSampleData();
             updateDashboard();
             renderInventoryTable();
             renderLowStockTable();
             initializeCharts();
             populateUsageItemDropdown();
         });
-
-        // Load sample data for demonstration
-        function loadSampleData() {
-            // Sample inventory items
-            inventoryData = [
-                { 
-                    id: 1, 
-                    name: "A4 Paper (Ream)", 
-                    category: "stationery", 
-                    currentStock: 45, 
-                    reorderLevel: 20, 
-                    dailyUsage: 2.5,
-                    status: "Healthy" 
-                },
-                { 
-                    id: 2, 
-                    name: "Ballpoint Pens", 
-                    category: "stationery", 
-                    currentStock: 15, 
-                    reorderLevel: 25, 
-                    dailyUsage: 3.2,
-                    status: "Low" 
-                },
-                { 
-                    id: 3, 
-                    name: "Stapler", 
-                    category: "equipment", 
-                    currentStock: 3, 
-                    reorderLevel: 5, 
-                    dailyUsage: 0.1,
-                    status: "Low" 
-                },
-                { 
-                    id: 4, 
-                    name: "Laptop", 
-                    category: "electronics", 
-                    currentStock: 8, 
-                    reorderLevel: 3, 
-                    dailyUsage: 0.05,
-                    status: "Healthy" 
-                },
-                { 
-                    id: 5, 
-                    name: "Printer Cartridge", 
-                    category: "electronics", 
-                    currentStock: 0, 
-                    reorderLevel: 2, 
-                    dailyUsage: 0.3,
-                    status: "Out of Stock" 
-                },
-                { 
-                    id: 6, 
-                    name: "Desk Chair", 
-                    category: "furniture", 
-                    currentStock: 2, 
-                    reorderLevel: 3, 
-                    dailyUsage: 0.01,
-                    status: "Low" 
-                }
-            ];
-
-            // Generate sample usage data for the past 30 days
-            const today = new Date();
-            for (let i = 0; i < 30; i++) {
-                const date = new Date();
-                date.setDate(today.getDate() - (29 - i));
-                
-                inventoryData.forEach(item => {
-                    // Add some randomness to daily usage
-                    const randomFactor = 0.8 + Math.random() * 0.4;
-                    const usageQty = Math.round(item.dailyUsage * randomFactor);
-                    
-                    if (usageQty > 0) {
-                        usageData.push({
-                            itemId: item.id,
-                            itemName: item.name,
-                            category: item.category,
-                            quantity: usageQty,
-                            date: new Date(date)
-                        });
-                    }
-                });
-            }
-        }
 
         // Update dashboard statistics
         function updateDashboard() {
