@@ -1211,8 +1211,21 @@ function restoreData() {
     reader.readAsText(file);
 }
 
-function resetData() {
+async function resetData() {
     if (!confirm('This will delete ALL data. Continue?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/data/clear-all`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to clear database');
+        }
+    } catch (error) {
+        console.log('API not available, clearing locally only');
+    }
+    
     localStorage.clear();
     inventoryData = [];
     usageData = [];
